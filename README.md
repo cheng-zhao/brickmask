@@ -1,6 +1,7 @@
 # brickmask
 
 ![GitHub](https://img.shields.io/github/license/cheng-zhao/brickmask.svg)
+![Codacy grade](https://img.shields.io/codacy/grade/b780618f6c2144649f71de9814a36430.svg)
 
 ## Table of Contents
 
