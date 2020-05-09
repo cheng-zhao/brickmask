@@ -78,7 +78,7 @@ int read_ascii(const char *fname, const char comment, DATA **data, size_t *num,
   *num = n;
 
   if (verbose) {
-    printf("\r  Number of records: %ld.\n  Allocating memory ... ", n);
+    printf("\r  Number of records: %zu.\n  Allocating memory ... ", n);
     fflush(stdout);
   }
 
@@ -139,7 +139,7 @@ int read_ascii(const char *fname, const char comment, DATA **data, size_t *num,
   *num = n;
   fclose(fp);
   free(buf);
-  if (verbose) printf("\r  %ld valid objects recorded.\n", n);
+  if (verbose) printf("\r  %zu valid objects recorded.\n", n);
 
   return 0;
 }
