@@ -10,8 +10,8 @@
 -   [Compilation](#compilation)
 -   [Running](#running)
 -   [Configurations](#configurations)
--   [Todo list](#todo-list)
 -   [Acknowledgement](#acknowledgement)
+-   [Todo list](#todo-list)
 
 ## Introduction
 
