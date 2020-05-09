@@ -16,7 +16,7 @@
 
 brickmask is a tool for assigning bit codes defined on [Legacy Survey](http://legacysurvey.org) brick pixels<sup id="quote0">[1](#footnote1),[2](#footnote2)</sup> to a catalogue with sky coordinates: J2000 right ascension (RA) and declination (Dec) in degrees.
 
-A common usage of brickmask is to mark objects to be removed based on the veto masks defined on brick pixels. The input catalogue can be either a plain ASCII file, or in the [fits format](https://fits.gsfc.nasa.gov/fits_home.html). And a collection of fits-format brick mask files has to be provided. The input objects are then located in the bricks and assigned the corresponding bit codes as an additional attribute. Moreover, if the bricks are separated as multiple subsamples, another column indicating the subsample ID is also appended to the input catalogue.
+A common usage of brickmask is to mark objects to be removed based on the veto masks defined on brick pixels. The input catalogue can be either a plain ASCII file, or in the [FITS format](https://fits.gsfc.nasa.gov/fits_home.html). And a collection of FITS-format brick mask files has to be provided. The input objects are then located in the bricks and assigned the corresponding bit codes as an additional attribute. Moreover, if the bricks are separated as multiple subsamples, another column indicating the subsample ID is also appended to the input catalogue.
 
 brickmask is compliant with the ISO C99 and IEEE POSIX.1-2008 standards. It is written by Cheng Zhao (&#36213;&#25104;), and is distributed under the MIT license (see [LICENSE.txt](LICENSE.txt) for the details).
 
@@ -28,7 +28,7 @@ If you use this tool in research work that results in publications, please cite 
 
 ## Dependencies
 
--   [cfitsio](https://heasarc.gsfc.nasa.gov/fitsio): for fits file I/O.
+-   [cfitsio](https://heasarc.gsfc.nasa.gov/fitsio): for FITS file I/O.
 -   GLIBC `getopt.h`: for parsing command line options
 
 <small>[\[TOC\]](#table-of-contents)</small>
@@ -72,13 +72,13 @@ The entries of the configuration file is summarised as follows
 | `BRICK_LIST` | FITS table<sup id="quote1">[1](#footnote1)</sup> with the RA, Dec bounds of all bricks                                                                                      |         |
 | `BRICK_DIR`  | Directory for FITS table<sup id="quote2">[2](#footnote2)</sup> with bit codes for each brick                                                                                |         |
 | `INPUT`      | Input catalogue                                                                                                                                                             |         |
-| `FILE_TYPE`  | Format of the input catalogue: <br />`0`: ASCII format, with RA and Dec being the first two columns<br />`1`: fits format, with RA and Dec being the `RA` and `DEC` columns | 0       |
+| `FILE_TYPE`  | Format of the input catalogue: <br />`0`: ASCII format, with RA and Dec being the first two columns<br />`1`: FITS format, with RA and Dec being the `RA` and `DEC` columns | 0       |
 | `COMMENT`    | Comment symbol for the input catalogue<br />(lines starting with this symbol are omitted)                                                                                   | '#'     |
 | `OUTPUT`     | Output file<br />(in the same format as `INPUT`)                                                                                                                            |         |
 | `FORCE`      | Non-zero: overwrite existing files without asking<br />`0`: ask before overwriting files                                                                                    | 0       |
 | `VERBOSE`    | Non-zero: detailed standard outputs<br />`0`: concise standard outputs                                                                                                      | 1       |
 
-Apart from the input/output options, there are also some runtime settings of the brickmask tool, defined as macros in [define.h](define.h). For instance, [`MSK_COL`](define.h#L53) and [`CHK_COL`](define.h#L54) indicate the column names for the bit codes and subsample IDs appended to the fits-format output file. And for large input files with not too many columns, one may want to adjust the [`LEN_IN_LINE`](define.h#L65) value, which specifies the maximum number of characters reserved for each line of the input catalogue, to reduce the memory consumption of the brickmask tool.
+Apart from the input/output options, there are also some runtime settings of the brickmask tool, defined as macros in [define.h](define.h). For instance, [`MSK_COL`](define.h#L53) and [`CHK_COL`](define.h#L54) indicate the column names for the bit codes and subsample IDs appended to the FITS-format output file. And for large input files with not too many columns, one may want to adjust the [`LEN_IN_LINE`](define.h#L65) value, which specifies the maximum number of characters reserved for each line of the input catalogue, to reduce the memory consumption of the brickmask tool.
 
 <small>[\[TOC\]](#table-of-contents)</small>
 

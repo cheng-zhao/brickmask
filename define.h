@@ -164,6 +164,9 @@ typedef struct {
   char rest[LEN_IN_LINE];
   unsigned char mask;
 #if NUMSUB != 1
+#if NUMSUB > 7
+#error "Number of subsamples (NUMSUB) must be <= 7, for 1-byte ID"
+#endif
   unsigned char flag;
 #endif
 } DATA;
