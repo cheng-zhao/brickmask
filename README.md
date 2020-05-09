@@ -97,4 +97,5 @@ I thank Dr. Anand Raichoor for helpful discussions on the development and debugg
 <small>[\[TOC\]](#table-of-contents)</small>
 
 <span id="footnote1">1</span>. see e.g. [http://legacysurvey.org/dr8/files/#survey-bricks-fits-gz](http://legacysurvey.org/dr8/files/#survey-bricks-fits-gz) [&#8617;](#quote0) [&#8617;](#quote1)
+
 <span id="footnote2">2</span>. e.g. [http://legacysurvey.org/dr8/files/#region-survey-bricks-dr8-region-fits-gz](http://legacysurvey.org/dr8/files/#region-survey-bricks-dr8-region-fits-gz) [&#8617;](#quote0) [&#8617;](#quote2)
