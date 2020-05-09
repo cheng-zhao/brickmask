@@ -1,4 +1,4 @@
-# jobfork
+# brickmask
 
 ![GitHub](https://img.shields.io/github/license/cheng-zhao/brickmask.svg)
 
@@ -14,7 +14,7 @@
 
 ## Introduction
 
-brickmask is a tool for assigning bit codes defined on [Legacy Survey](http://legacysurvey.org) brick pixels[^1]^,^[^2] to a catalogue with sky coordinates: J2000 right ascension (RA) and declination (Dec) in degrees.
+brickmask is a tool for assigning bit codes defined on [Legacy Survey](http://legacysurvey.org) brick pixels<sup id="quote0">[1](#footnote1),[2](#footnote2)</sup> to a catalogue with sky coordinates: J2000 right ascension (RA) and declination (Dec) in degrees.
 
 A common usage of brickmask is to mark objects to be removed based on the veto masks defined on brick pixels. The input catalogue can be either a plain ASCII file, or in the [fits format](https://fits.gsfc.nasa.gov/fits_home.html). And a collection of fits-format brick mask files has to be provided. The input objects are then located in the bricks and assigned the corresponding bit codes as an additional attribute. Moreover, if the bricks are separated as multiple subsamples, another column indicating the subsample ID is also appended to the input catalogue.
 
@@ -69,8 +69,8 @@ The entries of the configuration file is summarised as follows
 
 | Parameter    | Description                                                                                                                                                                 | Default |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| `BRICK_LIST` | FITS table[^1] with the RA, Dec bounds of all bricks                                                                                                                        |         |
-| `BRICK_DIR`  | Directory for FITS table[^2] with bit codes for each brick                                                                                                                  |         |
+| `BRICK_LIST` | FITS table<sup id="quote1">[1](#footnote1)</sup> with the RA, Dec bounds of all bricks                                                                                                |         |
+| `BRICK_DIR`  | Directory for FITS table<sup id="quote2">[2](#footnote2)</sup> with bit codes for each brick                                                                                          |         |
 | `INPUT`      | Input catalogue                                                                                                                                                             |         |
 | `FILE_TYPE`  | Format of the input catalogue: <br />`0`: ASCII format, with RA and Dec being the first two columns<br />`1`: fits format, with RA and Dec being the `RA` and `DEC` columns | 0       |
 | `COMMENT`    | Comment symbol for the input catalogue<br />(lines starting with this symbol are omitted)                                                                                   | '#'     |
@@ -96,5 +96,5 @@ I thank Dr. Anand Raichoor for helpful discussions on the development and debugg
 
 <small>[\[TOC\]](#table-of-contents)</small>
 
-[^1]: see e.g. [http://legacysurvey.org/dr8/files/#survey-bricks-fits-gz](http://legacysurvey.org/dr8/files/#survey-bricks-fits-gz)
-[^2]: e.g. [http://legacysurvey.org/dr8/files/#region-survey-bricks-dr8-region-fits-gz](http://legacysurvey.org/dr8/files/#region-survey-bricks-dr8-region-fits-gz)
+<span id="footnote1">1</span>. see e.g. [http://legacysurvey.org/dr8/files/#survey-bricks-fits-gz](http://legacysurvey.org/dr8/files/#survey-bricks-fits-gz) [&#8617;](#quote0) [&#8617;](#quote1)
+<span id="footnote2">2</span>. e.g. [http://legacysurvey.org/dr8/files/#region-survey-bricks-dr8-region-fits-gz](http://legacysurvey.org/dr8/files/#region-survey-bricks-dr8-region-fits-gz) [&#8617;](#quote0) [&#8617;](#quote2)
