@@ -52,6 +52,8 @@ int read_list(const char *, char ***, double **, double **, double **,
 
 int read_wcs_header(fitsfile *, WCS *);
 
+int read_brick_mask(fitsfile *, MASK *);
+
 /********** read_data.c **********/
 
 /********** baselib.c **********/
@@ -78,7 +80,8 @@ int compare_idx(const void *, const void *);
 
 int write_ascii(const char *, const DATA *, const size_t, const int);
 
-int write_fits(const char *, const char *, const DATA *, const long, const int);
+int write_fits(const char *, const char *, const DATA *, const long,
+    const int, const int);
 
 /********** save_res.c **********/
 

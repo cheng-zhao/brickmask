@@ -63,16 +63,18 @@ int write_ascii(const char *fname, const DATA *data, const size_t num,
   /* Write file by chunks. */
   for (i = 0; i < num; i++) {
 #if NUMSUB == 1
-    n = snprintf(stmp, LEN_OUT_LINE, OFMT_DBL " " OFMT_DBL " %s %d\n",
+    n = snprintf(stmp, LEN_OUT_LINE, OFMT_DBL " " OFMT_DBL " %s %" PRIu64 "\n",
         data[i].ra, data[i].dec, data[i].rest, data[i].mask);
     CHECKSTR(n, LEN_OUT_LINE, "output line too long: " OFMT_DBL " " OFMT_DBL
-        " %s %d\nPlease enlarge LEN_OUT_LINE in `define.h`.\n",
+        " %s %" PRIu64 "\nPlease enlarge LEN_OUT_LINE in `define.h`.\n",
         data[i].ra, data[i].dec, data[i].rest, data[i].mask);
 #else
-    n = snprintf(stmp, LEN_OUT_LINE, OFMT_DBL " " OFMT_DBL " %s %d %d\n",
+    n = snprintf(stmp, LEN_OUT_LINE, OFMT_DBL " " OFMT_DBL " %s %" PRIu64
+        " %" SUB_COL_FMT "\n",
         data[i].ra, data[i].dec, data[i].rest, data[i].mask, data[i].flag);
     CHECKSTR(n, LEN_OUT_LINE, "output line too long: " OFMT_DBL " " OFMT_DBL
-        " %s %d %d\nPlease enlarge LEN_OUT_LINE in `define.h`.\n",
+        " %s %" PRIu64 " %" SUB_COL_FMT "\n"
+        "Please enlarge LEN_OUT_LINE in `define.h`.\n",
         data[i].ra, data[i].dec, data[i].rest, data[i].mask, data[i].flag);
 #endif
 
@@ -120,21 +122,47 @@ Return:
   A non-zero integer if there is problem.
 ******************************************************************************/
 int write_fits(const char *input, const char *output, const DATA *data,
-    const long num, const int verbose) {
+    const long num, const int masktype, const int verbose) {
   fitsfile *fin, *fptr;
   char fname[FLEN_FILENAME];
-  int n, exist, col, status;
+  int n, exist, col, status, nbyte;
   long i;
-  unsigned char *fitscol;
+  unsigned char *mskcol;
+
 #if NUMSUB == 1
   const int nnew = 1;
   char *ttype[1] = {MSK_COL};
-  char *tform[1] = {"B"};
+  char *tform[1];
 #else
+  subid_t *subcol;
   const int nnew = 2;
-  char *ttype[2] = {MSK_COL, CHK_COL};
-  char *tform[2] = {"B", "B"};
+  char *ttype[2] = {MSK_COL, SUB_COL};
+  char *tform[2];
+
+  tform[1] = SUB_COL_TYPE;
 #endif
+
+  switch (masktype) {
+    case TBYTE:
+      tform[0] = "B";
+      nbyte = 1;
+      break;
+    case TSHORT:
+      tform[0] = "UI";
+      nbyte = 2;
+      break;
+    case TINT:
+      tform[0] = "UK";
+      nbyte = 4;
+      break;
+    case TLONG:
+      tform[0] = "UJJ";
+      nbyte = 8;
+      break;
+    default:
+      P_EXT("wrong data type for maskbit codes.\n");
+      return ERR_INPUT;
+  }
 
   if (verbose) printf("\n  Filename: %s\n", output);
 
@@ -155,20 +183,49 @@ int write_fits(const char *input, const char *output, const DATA *data,
   if (fits_get_num_cols(fptr, &col, &status)) FITS_EXIT;
   if (fits_insert_cols(fptr, col + 1, nnew, ttype, tform, &status)) FITS_EXIT;
 
-  MY_ALLOC(fitscol, unsigned char, num, the output column);
-
-  /* Take into account the reordering of data */
-  for (i = 0; i < num; i++) fitscol[data[i].oridx] = data[i].mask;
-  if (fits_write_col(fptr, TBYTE, col + 1, 1, 1, num, fitscol, &status))
-    FITS_EXIT;
+  MY_ALLOC(mskcol, unsigned char, (num * nbyte), the output column);
 #if NUMSUB != 1
-  for (i = 0; i < num; i++) fitscol[data[i].oridx] = data[i].flag;
-  if (fits_write_col(fptr, TBYTE, col + 2, 1, 1, num, fitscol, &status))
+  if (sizeof(subid_t) == nbyte) {
+    MY_ALLOC(subcol, subid_t, num, the output column);
+  }
+  else subcol = (subid_t *) mskcol;
+#endif
+
+  /* Generate maskbit array, taking into account the reordering of data */
+  switch (masktype) {
+    case TBYTE:
+      for (i = 0; i < num; i++)
+        ((uint8_t *) mskcol)[data[i].oridx] = data[i].mask;
+      break;
+    case TSHORT:
+      for (i = 0; i < num; i++)
+        ((uint16_t *) mskcol)[data[i].oridx] = data[i].mask;
+      break;
+    case TINT:
+      for (i = 0; i < num; i++)
+        ((uint32_t *) mskcol)[data[i].oridx] = data[i].mask;
+      break;
+    case TLONG:
+      for (i = 0; i < num; i++)
+        ((uint64_t *) mskcol)[data[i].oridx] = data[i].mask;
+      break;
+  }
+  if (fits_write_col(fptr, TBYTE, col + 1, 1, 1, num, mskcol, &status))
+    FITS_EXIT;
+
+#if NUMSUB != 1
+  for (i = 0; i < num; i++) subcol[data[i].oridx] = data[i].flag;
+  if (fits_write_col(fptr, TBYTE, col + 2, 1, 1, num, subcol, &status))
     FITS_EXIT;
 #endif
 
   if (fits_close_file(fptr, &status)) FITS_EXIT;
-  free(fitscol);
+  free(mskcol);
+#if NUMSUB != 1
+  if (sizeof(subid_t) == nbyte) {
+    free(subcol);
+  }
+#endif
   return 0;
 }
 

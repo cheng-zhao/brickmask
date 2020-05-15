@@ -19,7 +19,7 @@ brickmask is a tool for assigning bit codes defined on [Legacy Survey](http://le
 
 A common usage of brickmask is to mark objects to be removed based on the veto masks defined on brick pixels. The input catalogue can be either a plain ASCII file, or in the [FITS format](https://fits.gsfc.nasa.gov/fits_home.html). And a collection of FITS-format brick mask files has to be provided. The input objects are then located in the bricks and assigned the corresponding bit codes as an additional attribute. Moreover, if the bricks are separated as multiple subsamples, another column indicating the subsample ID is also appended to the input catalogue.
 
-brickmask is compliant with the ISO C99 and IEEE POSIX.1-2008 standards. It is written by Cheng Zhao (&#36213;&#25104;), and is distributed under the MIT license (see [LICENSE.txt](LICENSE.txt) for the details).
+brickmask is compliant with the ISO C99 and IEEE POSIX.1-2008 standards. It is written by Cheng Zhao (&#36213;&#25104;), and is distributed under the [MIT license](LICENSE.txt).
 
 If you use this tool in research work that results in publications, please cite the following paper:
 

@@ -36,11 +36,11 @@
 
 int main(int argc, char *argv[]) {
   fitsfile *fptr;
-  int i, j, k, err, exist, status;
+  int i, j, k, err, exist, status, dtype;
   size_t nbrick, ndata;
   long m, n, cnt;
   long *ubi;    /* unique brick index */
-  unsigned char bit;
+  uint64_t bit;
   char conf_file[FLEN_FILENAME], fname[FLEN_FILENAME], stmp[FLEN_FILENAME];
   char **brickname;
   const char *fnamefmt[NUMSUB] = SUB_FNAME;
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
   /* Read the list of bricks. */
   printf("Reading the list of bricks ... ");
   fflush(stdout);
-  status = exist = 0;
+  dtype = status = exist = 0;
 
   if ((err = read_list(conf.list, &brickname, &ra1, &ra2, &dec1, &dec2,
       &nbrick, conf.verbose))) {
@@ -206,13 +206,6 @@ int main(int argc, char *argv[]) {
       if (exist <= 0) continue; /* omit non-existing files */
 
       if (fits_open_data(&fptr, fname, READONLY, &status)) FITS_EXIT;
-      if (fits_read_key(fptr, TINT, "NAXIS", &j, stmp, &status)) FITS_EXIT;
-      if (j != 2) {
-        P_ERR("wrong dimension in file: %s\n", fname);
-        exit(BAD_NAXIS);
-      }
-      if (fits_read_key(fptr, TINT, "NAXIS1", &j, stmp, &status)) FITS_EXIT;
-      if (fits_read_key(fptr, TINT, "NAXIS2", &k, stmp, &status)) FITS_EXIT;
 
       /* deal with coordinate convention keys */
       if ((err = read_wcs_header(fptr, &wcs))) {
@@ -221,18 +214,17 @@ int main(int argc, char *argv[]) {
         exit(err);
       }
 
-      /* allocate memory for the mask bits if necessary */
-      n = (long) j * k;
-      if (maskbit.d1 * maskbit.d2 != j * k) {
-        if (maskbit.bit) free(maskbit.bit);
-        MY_ALLOC(maskbit.bit, unsigned char, n, bricks);
+      /* read maskbit codes */
+      if ((err = read_brick_mask(fptr, &maskbit))) {
+        printf(FMT_FAIL);
+        P_EXT("failed to read maskbiy codes from file: %s\n", fname);
+        exit(err);
       }
-      maskbit.d1 = j;
-      maskbit.d2 = k;
 
-      /* read brick */
-      if (fits_read_tblbytes(fptr, 1, 1, n, maskbit.bit, &status)) FITS_EXIT;
       if (fits_close_file(fptr, &status)) FITS_EXIT;
+
+      /* keep track of the longest data type */
+      if (dtype < maskbit.dtype) dtype = maskbit.dtype;
 
       /* assign mask to data */
       for (n = ubi[m]; n < ubi[m + 1]; n++) {
@@ -250,7 +242,25 @@ int main(int argc, char *argv[]) {
           exit(KEY_OUT_BOUNDS);
         }
 
-        bit = maskbit.bit[j + (long) k * maskbit.d1];
+        switch (maskbit.dtype) {
+          case TBYTE:
+            bit = ((uint8_t *) maskbit.bit)[j + k * maskbit.d1];
+            break;
+          case TSHORT:
+            bit = ((uint16_t *) maskbit.bit)[j + k * maskbit.d1];
+            break;
+          case TINT:
+            bit = ((uint32_t *) maskbit.bit)[j + k * maskbit.d1];
+            break;
+          case TLONG:
+            bit = ((uint64_t *) maskbit.bit)[j + k * maskbit.d1];
+            break;
+          default:
+            printf(FMT_FAIL);
+            P_EXT("wrong data type for maskbit codes.\n");
+            exit(ERR_INPUT);
+        }
+
         if (MASK_VALID) {
           if (XYBUG > 0 && (XYBUG_VALID)) data[n].mask += bit - XYBUG;
           else data[n].mask += bit;
@@ -298,7 +308,7 @@ int main(int argc, char *argv[]) {
     }
   }
   else if (conf.format == 1) {
-    if ((err = write_fits(conf.input, conf.output, data, ndata,
+    if ((err = write_fits(conf.input, conf.output, data, ndata, dtype,
         conf.verbose))) {
       printf(FMT_FAIL);
       P_EXT("failed to save results to the output FITS file.\n");

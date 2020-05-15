@@ -160,7 +160,7 @@ Return:
 int read_fits(const char *fname, DATA **data, size_t *num, const int verbose) {
   fitsfile *fptr;
   int col, status;
-  long i, n;
+  long i, n, nread, ntodo, nrest;
   double *fitscol;
 
   if (verbose) printf("\n  Filename: %s\n", fname);
@@ -173,7 +173,7 @@ int read_fits(const char *fname, DATA **data, size_t *num, const int verbose) {
     fflush(stdout);
   }
 
-  MY_ALLOC(fitscol, double, n, the column of input data);
+  MY_ALLOC(fitscol, double, FITS_BUFFER, the column of input data);
   MY_ALLOC(*data, DATA, n, the input data);
   memset(*data, 0, sizeof(DATA) * n);
 
@@ -181,13 +181,32 @@ int read_fits(const char *fname, DATA **data, size_t *num, const int verbose) {
       sizeof(DATA) * n / (1024.0 * 1024.0));
 
   if (fits_get_colnum(fptr, CASEINSEN, "RA", &col, &status)) FITS_EXIT;
-  if (fits_read_col_dbl(fptr, col, 1, 1, n, 0, fitscol, 0, &status)) FITS_EXIT;
-  for (i = 0; i < n; i++)
-    (*data)[i].ra = (fitscol[i] == 360) ? 0 : fitscol[i];
+
+  nread = 0;
+  nrest = n;
+  while (nrest) {
+    ntodo = MINVAL(nrest, FITS_BUFFER);
+    if (fits_read_col_dbl(fptr, col, nread+1, 1, ntodo, 0, fitscol, 0, &status))
+      FITS_EXIT;
+    for (i = 0; i < ntodo; i++)
+      (*data)[i + nread].ra = (fitscol[i] == 360) ? 0 : fitscol[i];
+    nread += ntodo;
+    nrest -= ntodo;
+  }
 
   if (fits_get_colnum(fptr, CASEINSEN, "DEC", &col, &status)) FITS_EXIT;
-  if (fits_read_col_dbl(fptr, col, 1, 1, n, 0, fitscol, 0, &status)) FITS_EXIT;
-  for (i = 0; i < n; i++) (*data)[i].dec = fitscol[i];
+
+  nread = 0;
+  nrest = n;
+  while (nrest) {
+    ntodo = MINVAL(nrest, FITS_BUFFER);
+    if (fits_read_col_dbl(fptr, col, nread+1, 1, ntodo, 0, fitscol, 0, &status))
+      FITS_EXIT;
+    for (i = 0; i < ntodo; i++)
+      (*data)[i + nread].dec = fitscol[i];
+    nread += ntodo;
+    nrest -= ntodo;
+  }
 
   if (fits_close_file(fptr, &status)) FITS_EXIT;
   free(fitscol);
@@ -357,6 +376,76 @@ int read_wcs_header(fitsfile *fptr, WCS *wcs) {
     P_ERR("the CD matrix is not reversible.\n");
     return WCS_ERROR;
   }
+
+  return 0;
+}
+
+
+/******************************************************************************
+Function `read_brick_mask`:
+  Read the maskbit codes of a fits file.
+
+Arguments:
+  * `fptr`:     a pointer to the opened fits file;
+  * `msk`:      a pointer to the structure for storing maskbit codes.
+Return:
+  A non-zero integer if there is problem.
+******************************************************************************/
+int read_brick_mask(fitsfile *fptr, MASK *msk) {
+  int hdutype, bitpix, naxis, status;
+  long naxes[2];
+  long totpix = 0;
+
+  status = 0;
+  if (fits_get_hdu_type(fptr, &hdutype, &status)) FITS_EXIT;
+  if (hdutype != IMAGE_HDU) {
+    P_ERR("the first HDU of the brick file must be IMAGE_HDU.\n");
+    return ERR_FILE;
+  }
+
+  naxis = 0;
+  naxes[0] = naxes[1] = 0;
+  if (fits_get_img_param(fptr, 2, &bitpix, &naxis, naxes, &status)) FITS_EXIT;
+
+  if (naxis != 2) {
+    P_ERR("the image dimension of the brick file must be 2.\n");
+    return ERR_FILE;
+  }
+
+  switch (bitpix) {
+    case BYTE_IMG:
+      msk->dtype = TBYTE;
+      break;
+    case SHORT_IMG:
+      msk->dtype = TSHORT;
+      break;
+    case LONG_IMG:
+      msk->dtype = TINT;
+      break;
+    case LONGLONG_IMG:
+      msk->dtype = TLONG;
+      break;
+    default:
+      P_ERR("the maskbit codes must be integers.\n");
+      return ERR_FILE;
+  }
+
+  totpix = naxes[0] * naxes[1];
+  if (totpix != msk->d1 * msk->d2) {
+    msk->d1 = naxes[0];
+    msk->d2 = naxes[1];
+    if (msk->bit) msk->bit = realloc(msk->bit, totpix * (bitpix >> 3));
+    else msk->bit = calloc(totpix, bitpix >> 3);
+    if (!msk->bit) {
+      P_ERR("failed to allocate memory for maskbit codes.\n");
+      return ERR_MEM;
+    }
+  }
+
+  /* turn off any scaling so that we copy the raw pixel values */
+  if (fits_set_bscale(fptr, 1, 0, &status)) FITS_EXIT;
+  if (fits_read_img(fptr, msk->dtype, 1, totpix, 0, msk->bit, 0, &status))
+    FITS_EXIT;
 
   return 0;
 }
