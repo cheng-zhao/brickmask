@@ -450,10 +450,10 @@ static int conf_verify(const cfg_t *cfg, CONF *conf) {
             BRICKMASK_MAX_COLUMN);
         return BRICKMASK_ERR_CFG;
       }
-      if (conf->cnum[0] == conf->cnum[1]) {
-        P_ERR("identical RA and Dec columns: %d\n", conf->cnum[0]);
-        return BRICKMASK_ERR_CFG;
-      }
+    }
+    if (conf->cnum[0] == conf->cnum[1]) {
+      P_ERR("identical RA and Dec columns: %d\n", conf->cnum[0]);
+      return BRICKMASK_ERR_CFG;
     }
   }
   else if (!strcmp(conf->cname[0], conf->cname[1])) {

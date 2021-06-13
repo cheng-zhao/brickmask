@@ -71,7 +71,7 @@ Column numbers (ASCII format, starting from 1) or names (FITS format, case insen
 COORD_COLUMN = [1,2]
     # ASCII: first column for RA, second column for Dec
 COORD_COLUMN = [RA,DEC]
-    # FITS: "RA" for RA, "Dec" for Dec
+    # FITS: "RA" for RA, "DEC" for Dec
 ```
 
 ### `OUTPUT` (`-o` / `--output`)

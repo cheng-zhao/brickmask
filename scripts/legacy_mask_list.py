@@ -50,4 +50,4 @@ for cap in caps:
 
   with open(ofile, 'w') as f:
     f.writelines(fnames)
-    
+
