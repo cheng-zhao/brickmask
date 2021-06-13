@@ -1,4 +1,3 @@
-
 # brickmask
 
 ![GitHub](https://img.shields.io/github/license/cheng-zhao/brickmask.svg)
@@ -10,8 +9,8 @@
 -   [Compilation](#compilation)
 -   [Running](#running)
 -   [Configurations](#configurations)
--   [Acknowledgement](#acknowledgement)
--   [Todo list](#todo-list)
+-   [Acknowledgements](#acknowledgements)
+-   [References](#references)
 
 ## Introduction
 
@@ -26,10 +25,10 @@ This tool was originally developed for the [*Extended Baryon Oscillation Spectro
 > Zhao et al., 2021, [The completed SDSS-IV extended Baryon Oscillation Spectroscopic Survey: 1000 multi-tracer mock catalogues with redshift evolution and systematics for galaxies and quasars of the final data release](https://doi.org/10.1093/mnras/stab510), *MNRAS*, 503(1):1149&ndash;1173 ([arXiv:2007.08997](https://arxiv.org/abs/2007.08997))
 
 
-<small><span id="footnote1">1.</span> see e.g. [http://legacysurvey.org/dr9/files/#survey-bricks-fits-gz](http://legacysurvey.org/dr9/files/#survey-bricks-fits-gz) [&#8617;](#quote0)</small>
-<small><span id="footnote2">2.</span> e.g. [https://www.legacysurvey.org/dr9/bitmasks](https://www.legacysurvey.org/dr9/bitmasks) [&#8617;](#quote0)</small>
+<sub><span id="footnote1">1.</span> see e.g. [http://legacysurvey.org/dr9/files/#survey-bricks-fits-gz](http://legacysurvey.org/dr9/files/#survey-bricks-fits-gz) [&#8617;](#quote0)</sub><br />
+<sub><span id="footnote2">2.</span> e.g. [https://www.legacysurvey.org/dr9/bitmasks](https://www.legacysurvey.org/dr9/bitmasks) [&#8617;](#quote0)</sub>
 
-<small>[\[TOC\]](#table-of-contents)</small>
+<sub>[\[TOC\]](#table-of-contents)</sub>
 
 ## Compilation
 
@@ -45,14 +44,14 @@ To enable MPI support, a compiler wrapper for MPI programs (such as `mpicc`) mus
 The other optional compilation flags (can be set via `CFLAGS`) are summarised below:
 
 | Compilation Flag | Usage                                                                        |
-|:----------------:|------------------------------------------------------------------------------| 
+|:----------------:|------------------------------------------------------------------------------|
 | `-DEBOSS`        | for eBOSS ELG masks<sup id="quote1">[3](#footnote3)</sup>                    |
 | `-DFAST_FIT_IMG` | enable low-level maskbits file reading<sup id="quote2">[4](#footnote4)</sup> |
 
-<small><span id="footnote3">3.</span> See [https://data.sdss.org/datamodel/files/EBOSS_LSS/catalogs/DR16/ELGmask/mask.html](https://data.sdss.org/datamodel/files/EBOSS_LSS/catalogs/DR16/ELGmask/mask.html). Note also that there are additional eBOSS ELG masks that should be set using the script [eBOSS_ELG_extra.py](scripts/eBOSS_ELG_extra.py). [&#8617;](#quote1)</small>
-<small><span id="footnote4">4.</span> The low-level FITS image reader is &sim; 4 times faster than the default reader for plain images, but only marginally faster for gzipped images. Note that it should never be enabled for maskbits compressed with algorithms other than gzip (such as `.fits.fz` files). [&#8617;](#quote2)</small>
+<sub><span id="footnote3">3.</span> See [https://data.sdss.org/datamodel/files/EBOSS_LSS/catalogs/DR16/ELGmask/mask.html](https://data.sdss.org/datamodel/files/EBOSS_LSS/catalogs/DR16/ELGmask/mask.html). Note also that there are additional eBOSS ELG masks that should be set using the script [eBOSS_ELG_extra.py](scripts/eBOSS_ELG_extra.py). [&#8617;](#quote1)</sub><br />
+<sub><span id="footnote4">4.</span> The low-level FITS image reader is &sim; 4 times faster than the default reader for plain images, but only marginally faster for gzipped images. Note that it should never be enabled for maskbits compressed with algorithms other than gzip (such as `.fits.fz` files). [&#8617;](#quote2)</sub>
 
-<small>[\[TOC\]](#table-of-contents)</small>
+<sub>[\[TOC\]](#table-of-contents)</sub>
 
 ## Running
 
@@ -65,7 +64,7 @@ Moreover, if MPI is enabled, the code should be run with an MPI executable, such
 
 Once the program is run successfully, it looks for the configuration file set via the `-c` command line option, or `brickmask.conf` by default (see [CONFIG.md](CONFIG.md) for details). Configuration parameters can also be set via command line options, which override the entries in the configuration file. A list of all command line options can be found with the `-h`/`--help` option.
 
-<small>[\[TOC\]](#table-of-contents)</small>
+<sub>[\[TOC\]](#table-of-contents)</sub>
 
 ## Configurations
 
@@ -73,13 +72,13 @@ Detailed descriptions of all configuration parameters can be found in [CONFIG.md
 
 Apart from parameters that can be supplied via command line options and the configuration file, there are also some runtime settings defined as macros in [`define.h`](src/define.h). For instance, [`BRICKMASK_FITS_MASKBIT`](src/define.h#L92) and [`BRICKMASK_FITS_SUBID`](src/define.h#L93) indicate column names of maskbit codes and subsample IDs for the FITS-format output catalogue.
 
-<small>[\[TOC\]](#table-of-contents)</small>
+<sub>[\[TOC\]](#table-of-contents)</sub>
 
 ## Acknowledgements
 
 I thank Dr. Anand Raichoor for helpful discussions on the development and debugging of this tool, and Dr. Arnaud de Mattia for sharing the original script for assigning extra maskbit codes for eBOSS ELGs.
 
-<small>[\[TOC\]](#table-of-contents)</small>
+<sub>[\[TOC\]](#table-of-contents)</sub>
 
 ## References
 
@@ -87,5 +86,5 @@ I thank Dr. Anand Raichoor for helpful discussions on the development and debugg
 
 <span id="ref2">\[2\]</span> Zhao et al., 2021, [The completed SDSS-IV extended Baryon Oscillation Spectroscopic Survey: 1000 multi-tracer mock catalogues with redshift evolution and systematics for galaxies and quasars of the final data release](https://doi.org/10.1093/mnras/stab510), *MNRAS*, 503(1):1149&ndash;1173 ([arXiv:2007.08997](https://arxiv.org/abs/2007.08997))
 
-<small>[\[TOC\]](#table-of-contents)</small>
+<sub>[\[TOC\]](#table-of-contents)</sub>
 
