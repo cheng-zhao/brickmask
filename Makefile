@@ -1,13 +1,38 @@
 CC = gcc
+MPICC = mpicc
+CFLAGS = -std=c99 -O3 -Wall
 LIBS = -lm -lcfitsio
-INCL = 
-OPTS = -O3 -Wall $(INCL) $(LIBS) #-DOMP -fopenmp
-SRCS = baselib.c brickmask.c find_brick.c load_conf.c read_data.c save_res.c
-EXEC = brickmask
+INCL = -Isrc -Ilib -Iio
+# Set "USE_MPI = T" to enable MPI parallelisation
+USE_MPI = T
+# Uncomment the following line for eBOSS ELG masks
+#CFLAGS += -DEBOSS -DFAST_FITS_IMG
 
-all:
-	$(CC) $(SRCS) -o $(EXEC) $(OPTS)
+# Settings for CFITSIO
+CFITSIO_DIR = 
+ifneq ($(CFITSIO_DIR),)
+  LIBS += -L$(CFITSIO_DIR)/lib
+  INCL += -I$(CFITSIO_DIR)/include
+endif
+
+# Settings for MPI
+ifeq ($(USE_MPI), T)
+  TARGET=BRICKMASK_MPI
+  CFLAGS += -DMPI
+else
+  TARGET=BRICKMASK_NOMPI
+endif
+
+SRCS = $(wildcard src/*.c lib/*.c io/*.c)
+EXEC = BRICKMASK
+
+all: $(TARGET)
+
+BRICKMASK_NOMPI:
+	$(CC) $(CFLAGS) -o $(EXEC) $(SRCS) $(LIBS) $(INCL)
+
+BRICKMASK_MPI:
+	$(MPICC) $(CFLAGS) -o $(EXEC) $(SRCS) $(LIBS) $(INCL)
 
 clean:
-	rm -f $(EXEC)
-
+	rm $(EXEC)
