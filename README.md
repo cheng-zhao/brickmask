@@ -43,10 +43,10 @@ To enable MPI support, a compiler wrapper for MPI programs (such as `mpicc`) mus
 
 The other optional compilation flags (can be set via `CFLAGS`) are summarised below:
 
-| Compilation Flag | Usage                                                                        |
-|:----------------:|------------------------------------------------------------------------------|
-| `-DEBOSS`        | for eBOSS ELG masks<sup id="quote1">[3](#footnote3)</sup>                    |
-| `-DFAST_FIT_IMG` | enable low-level maskbits file reading<sup id="quote2">[4](#footnote4)</sup> |
+| Compilation Flag  | Usage                                                                        |
+|:-----------------:|------------------------------------------------------------------------------|
+| `-DEBOSS`         | for eBOSS ELG masks<sup id="quote1">[3](#footnote3)</sup>                    |
+| `-DFAST_FITS_IMG` | enable low-level maskbits file reading<sup id="quote2">[4](#footnote4)</sup> |
 
 <sub><span id="footnote3">3.</span> See [https://data.sdss.org/datamodel/files/EBOSS_LSS/catalogs/DR16/ELGmask/mask.html](https://data.sdss.org/datamodel/files/EBOSS_LSS/catalogs/DR16/ELGmask/mask.html). Note also that there are additional eBOSS ELG masks that should be set using the script [eBOSS_ELG_extra.py](scripts/eBOSS_ELG_extra.py). [&#8617;](#quote1)</sub><br />
 <sub><span id="footnote4">4.</span> The low-level FITS image reader is &sim; 4 times faster than the default reader for plain images, but only marginally faster for gzipped images. Note that it should never be enabled for maskbits compressed with algorithms other than gzip (such as `.fits.fz` files). [&#8617;](#quote2)</sub>

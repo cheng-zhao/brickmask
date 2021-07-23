@@ -32,7 +32,7 @@ Moreover, the script [`legacy_mask_list.py`](scripts/legacy_mask_list.py) is for
 
 ### `MASKBIT_NULL` (`-n` / `--mask-null`)
 
-Bit code for objects that are not found in any of the given maskbits files. It is recommended to set it to `1` for eBOSS ELG masks, and `0` for Legacy Survey masks (e.g. [https://www.legacysurvey.org/dr9/bitmasks](https://www.legacysurvey.org/dr9/bitmasks/)).
+Bit code for objects that are not found in any of the given maskbits files. It is recommended to set it to `0` for eBOSS ELG masks, and `1` for Legacy Survey masks (e.g. [https://www.legacysurvey.org/dr9/bitmasks](https://www.legacysurvey.org/dr9/bitmasks/)).
 
 ### `SUBSAMPLE_ID` (`-s` / `--sample-id`)
 

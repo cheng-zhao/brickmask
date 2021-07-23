@@ -49,9 +49,9 @@
 #define DEFAULT_VERBOSE                 true
 
 #ifdef EBOSS
-#define DEFAULT_MASK_NULL               1
-#else
 #define DEFAULT_MASK_NULL               0
+#else
+#define DEFAULT_MASK_NULL               1
 #endif
 
 #define BRICKMASK_MAX_SUBID             UCHAR_MAX
