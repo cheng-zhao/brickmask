@@ -59,9 +59,12 @@ static BRICK *brick_init(const CONF *conf) {
     brick_destroy(brick);
     return NULL;
   }
-  for (int i = 0; i < brick->nsp; i++) {
-    brick->subid[i] = conf->subid[i];
-    brick->fmask[i] = NULL;
+  for (int i = 0; i < brick->nsp; i++) brick->fmask[i] = NULL;
+  if (conf->subid) {
+    for (int i = 0; i < brick->nsp; i++) brick->subid[i] = conf->subid[i];
+  }
+  else {
+    for (int i = 0; i < brick->nsp; i++) brick->subid[i] = i;
   }
 
   return brick;
