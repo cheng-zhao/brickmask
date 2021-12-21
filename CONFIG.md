@@ -84,6 +84,10 @@ Optional parameter for column numbers (ASCII format, starting from 1) or names (
 
 If `OUTPUT_COLUMN` is not set, all columns of the input catalogue will be saved in the original order to the output, in addition with the columns for maskbits and subsample IDs.
 
+### `MASKBIT_COLUMN` (`-M` / `--mask-col`)
+
+Name of the maskbit column in the FITS-format output catalogue. It must be composed of letters, digits, and underscore.
+
 ### `OVERWRITE` (`-O` / `--overwrite`)
 
 An integer value indicating whether to overwrite existing files. Allowed values are

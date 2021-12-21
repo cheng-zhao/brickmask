@@ -112,6 +112,8 @@ Assign maskbit codes to a catalog with sky coordinates.\n\
         Set the output catalog\n\
   -e, --output-col      " FMT_KEY(OUTPUT_COLUMN) "   String array\n\
         Set columns to be written to the output catalog\n\
+  -M, --mask-col        " FMT_KEY(MASKBIT_COLUMN) "  String\n\
+        Set the name of the maskbit column for FITS-format output\n\
   -O, --overwrite       " FMT_KEY(OVERWRITE) "       Integer\n\
         Indicate whether to overwrite existing output files\n\
   -v, --verbose         " FMT_KEY(VERBOSE) "         Boolean\n\
@@ -174,6 +176,8 @@ OUTPUT_COLUMN   = \n\
     # If not set, all columns of `INPUT` are saved in the original order.\n\
     # Note that maskbits (and optionally subsample IDs) are always saved\n\
     # as the last column (or last two columns).\n\
+MASKBIT_COLUMN  = \n\
+    # String, name of the maskbit column in the FITS-format `OUTPUT`.\n\
 OVERWRITE       = \n\
     # Flag indicating whether to overwrite existing files, integer (unset: %d).\n\
     # Allowed values are:\n\
@@ -204,7 +208,7 @@ Return:
 static CONF *conf_init(void) {
   CONF *conf = calloc(1, sizeof *conf);
   if (!conf) return NULL;
-  conf->fconf = conf->flist = conf->input = conf->output = NULL;
+  conf->fconf = conf->flist = conf->input = conf->output = conf->mcol = NULL;
   conf->fmask = conf->cname = conf->ocol = NULL;
   conf->subid = conf->onum = NULL;
   return conf;
@@ -247,6 +251,7 @@ static cfg_t *conf_read(CONF *conf, const int argc, char *const *argv) {
     {'C', "coord-col"   , "COORD_COLUMN"   , CFG_ARRAY_STR , &conf->cname   },
     {'o', "output"      , "OUTPUT"         , CFG_DTYPE_STR , &conf->output  },
     {'e', "output-col"  , "OUTPUT_COLUMN"  , CFG_ARRAY_STR , &conf->ocol    },
+    {'M', "mask-col"    , "MASKBIT_COLUMN" , CFG_DTYPE_STR , &conf->mcol    },
     {'O', "overwrite"   , "OVERWRITE"      , CFG_DTYPE_INT , &conf->ovwrite },
     {'v', "verbose"     , "VERBOSE"        , CFG_DTYPE_BOOL, &conf->verbose }
   };
@@ -529,6 +534,47 @@ static int conf_verify(const cfg_t *cfg, CONF *conf) {
     }
   }
 
+  /* MASKBIT_COLUMN */
+  if (conf->ftype == BRICKMASK_FFMT_FITS) {
+    if (!cfg_is_set(cfg, &conf->mcol)) {
+      P_ERR(FMT_KEY(MASKBIT_COLUMN) " is not set\n");
+      return BRICKMASK_ERR_CFG;
+    }
+    /* Remove quotation marks. */
+    if (conf->mcol[0] == '\'' || conf->mcol[0] == '"') {
+      char quote = conf->mcol[0];
+      int end = 0;
+      for (int i = 1; conf->mcol[i] != '\0'; i++) {
+        if (conf->mcol[i] == quote) {
+          conf->mcol[i] = '\0';
+          end = i;
+          break;
+        }
+      }
+      if (end == 0) {
+        P_ERR("Unbalanced quotation mark in " FMT_KEY(MASKBIT_COLUMN) "\n");
+        return BRICKMASK_ERR_CFG;
+      }
+      memmove(conf->mcol, conf->mcol + 1, sizeof(char) * end);
+    }
+    /* Check characters. */
+    if (conf->mcol[0] == '\0') {
+      P_ERR(FMT_KEY(MASKBIT_COLUMN) " is empty\n");
+      return BRICKMASK_ERR_CFG;
+    }
+    for (int i = 0; conf->mcol[i] != '\0'; i++) {
+      if (i >= BRICKMASK_FITS_MAX_COLNAME) {
+        P_ERR(FMT_KEY(MASKBIT_COLUMN) " is too long: %s\n", conf->mcol);
+        return BRICKMASK_ERR_CFG;
+      }
+      if (conf->mcol[i] != '_' && !isalnum(conf->mcol[i])) {
+        P_ERR("Invalid character in " FMT_KEY(MASKBIT_COLUMN) ": '%c'\n",
+            conf->mcol[i]);
+        return BRICKMASK_ERR_CFG;
+      }
+    }
+  }
+
   /* VERBOSE */
   if (!cfg_is_set(cfg, &conf->verbose)) conf->verbose = DEFAULT_VERBOSE;
 
@@ -581,6 +627,8 @@ static void conf_print(const CONF *conf) {
       for (int i = 1; i < conf->ncol; i++) printf(" , %s", conf->ocol[i]);
     }
   }
+  if (conf->ftype == BRICKMASK_FFMT_FITS)
+    printf("\n  MASKBIT_COLUMN  = %s\n", conf->mcol);
 
   printf("\n  OVERWRITE       = %d\n", conf->ovwrite);
 }
@@ -644,5 +692,6 @@ void conf_destroy(CONF *conf) {
   FREE_ARRAY(conf->output);
   FREE_STR_ARRAY(conf->ocol);
   FREE_ARRAY(conf->onum);
+  FREE_ARRAY(conf->mcol);
   free(conf);
 }

@@ -70,7 +70,7 @@ Once the program is run successfully, it looks for the configuration file set vi
 
 Detailed descriptions of all configuration parameters can be found in [CONFIG.md](CONFIG.md).
 
-Apart from parameters that can be supplied via command line options and the configuration file, there are also some runtime settings defined as macros in [`define.h`](src/define.h). For instance, [`BRICKMASK_FITS_MASKBIT`](src/define.h#L92) and [`BRICKMASK_FITS_SUBID`](src/define.h#L93) indicate column names of maskbit codes and subsample IDs for the FITS-format output catalogue.
+Apart from parameters that can be supplied via command line options and the configuration file, there are also some runtime settings defined as macros in [`define.h`](src/define.h). For instance, [`BRICKMASK_FITS_SUBID`](src/define.h#L93) indicates the column name of subsample IDs for the FITS-format output catalogue.
 
 <sub>[\[TOC\]](#table-of-contents)</sub>
 

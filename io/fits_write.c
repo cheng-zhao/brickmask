@@ -180,7 +180,7 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
 #endif
 
   /* Append maskbit and subsample ID columns. */
-  if (fits_insert_col(fp, nc + 1, BRICKMASK_FITS_MASKBIT,
+  if (fits_insert_col(fp, nc + 1, conf->mcol,
       BRICKMASK_MASKBIT_TFORM, &status)) FITS_WRITE_ABORT;
 #if BRICKMASK_WFITS_SUBID == 1
   if (fits_insert_col(fp, nc + 2, BRICKMASK_FITS_SUBID, "B", &status))

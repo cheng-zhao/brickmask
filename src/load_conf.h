@@ -54,6 +54,7 @@ typedef struct {
   char **ocol;          /* OUTPUT_COLUMN        */
   int ncol;             /* Number of output columns. */
   int *onum;            /* Column numbers to be saved to the output. */
+  char *mcol;           /* MASKBIT_COLUMN       */
   int ovwrite;          /* OVERWRITE            */
   bool verbose;         /* VERBOSE              */
 } CONF;

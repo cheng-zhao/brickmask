@@ -81,6 +81,8 @@ Return:
 ******************************************************************************/
 static inline int get_brick_id(BRICK *brick, DATA *data) {
   for (size_t i = 0; i < data->n; i++) {
+    if (data->ra[i] == 360) data->ra[i] -= BRICKMASK_TOL;
+    if (data->dec[i] == 90) data->dec[i] -= BRICKMASK_TOL;
     data->id[i] = find_brick(brick, data->ra[i], data->dec[i]);
     if (data->id[i] < 0) {
       P_ERR("cannot find the brick for coordinate (%g, %g)\n",

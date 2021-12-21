@@ -89,8 +89,9 @@
 #define BRICKMASK_FITS_RAMAX            "RA2"
 #define BRICKMASK_FITS_DECMIN           "DEC1"
 #define BRICKMASK_FITS_DECMAX           "DEC2"
-#define BRICKMASK_FITS_MASKBIT          "MASKBIT"
 #define BRICKMASK_FITS_SUBID            "SUBID"
+/* Maximum length of FITS columns. */
+#define BRICKMASK_FITS_MAX_COLNAME      32
 /* Case sensitivity of FITS columns. */
 #define BRICKMASK_FITS_CASESEN          CASEINSEN
 /* Minimum FITS memory file size. */

@@ -124,7 +124,7 @@ static inline void world2pix(const WCS *wcs, const double ra, const double dec,
   double phi1 = sind * wcs->ang[3] + fac1 * wcs->ang[4] + fac2 * wcs->ang[5];
   double phi2 = fac1 * wcs->ang[6] + fac2 * wcs->ang[7];
 
-  theta = sqrt(1 - theta * theta) / theta * RAD_2_DEGREE;
+  theta = (theta >= 1) ? 0 : sqrt(1 - theta * theta) / theta * RAD_2_DEGREE;
   double fac = theta / sqrt(phi1 * phi1 + phi2 * phi2);
   double xx = fac * phi2;
   double yy = -fac * phi1;

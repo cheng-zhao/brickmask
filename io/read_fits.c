@@ -286,10 +286,10 @@ int read_fits(const CONF *conf, DATA *data) {
 
   /* Check if the maskbit and subsample ID columns are alread in the file. */
   int col = 0;
-  if (fits_get_colnum(fp, BRICKMASK_FITS_CASESEN, BRICKMASK_FITS_MASKBIT,
+  if (fits_get_colnum(fp, BRICKMASK_FITS_CASESEN, conf->mcol,
       &col, &status) != COL_NOT_FOUND) {
     P_ERR("the maskbit column (%s) exists in the input catalog.",
-        BRICKMASK_FITS_MASKBIT);
+        conf->mcol);
     status = 0;
     fits_close_file(fp, &status);
     return BRICKMASK_ERR_FILE;

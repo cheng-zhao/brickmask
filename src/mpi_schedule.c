@@ -139,17 +139,33 @@ static void mpi_bcast_brick(BRICK **brick) {
   }
 
   /* Broadcast maskfit filenames. */
+  MPI_Request *nreq = malloc(b->nsp * sizeof *nreq);
+  if (!nreq) {
+    P_ERR("failed to allocate memory for broadcasting brick information\n");
+    MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
+  }
   for (int i = 0; i < b->nsp; i++) {
-    if (MPI_Bcast(b->fmask[i][0], b->mlen[i], MPI_CHAR, BRICKMASK_MPI_ROOT,
-        MPI_COMM_WORLD)) {
-      P_ERR("failed to broadcase brick information\n");
+    if (MPI_Ibcast(b->fmask[i][0], b->mlen[i], MPI_CHAR, BRICKMASK_MPI_ROOT,
+        MPI_COMM_WORLD, nreq + i)) {
+      P_ERR("failed to broadcast brick information\n");
       MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
     }
-    /* Search for individual filenames. */
-    char *end = b->fmask[i][0] + b->mlen[i];
-    for (size_t j = 1; j < b->nmask[i]; j++) {
-      char *p = b->fmask[i][j - 1];
-      b->fmask[i][j] = memchr(p, '\0', end - p) + 1;
+  }
+
+  if (MPI_Waitall(b->nsp, nreq, MPI_STATUSES_IGNORE)) {
+    P_ERR("failed to broadcast brick information\n");
+    MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
+  }
+  free(nreq);
+
+  if (rank != BRICKMASK_MPI_ROOT) {
+    for (int i = 0; i < b->nsp; i++) {
+      /* Search for individual filenames. */
+      char *end = b->fmask[i][0] + b->mlen[i];
+      for (size_t j = 1; j < b->nmask[i]; j++) {
+        char *p = b->fmask[i][j - 1];
+        b->fmask[i][j] = memchr(p, '\0', end - p) + 1;
+      }
     }
   }
 }
