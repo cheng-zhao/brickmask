@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     }
     else if (ev.u8 != 0xef) {
       P_EXT("unsupported system endianness\n");
-      BRICKMASK_QUIT(MPI_ERR_UNKNOWN);
+      BRICKMASK_QUIT(BRICKMASK_ERR_UNKNOWN);
     }
 #endif
 

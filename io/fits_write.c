@@ -193,8 +193,9 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
   if (fits_insert_rows(fp, 0, nr, &status)) FITS_WRITE_ABORT;
 
   /* Get the optimal row number for saving data. */
-  long nstep;
-  if (fits_get_rowsize(fp, &nstep, &status)) FITS_WRITE_ABORT;
+  long nstep0;
+  if (fits_get_rowsize(fp, &nstep0, &status)) FITS_WRITE_ABORT;
+  const long nstep = nstep0;
 
   /* Allocate memory for copying data by chunks. */
   if (!(chunk = malloc(owidth * nstep * sizeof(unsigned char)))) {
