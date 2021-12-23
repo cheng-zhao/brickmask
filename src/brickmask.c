@@ -49,6 +49,29 @@ int main(int argc, char *argv[]) {
 #ifdef MPI
   if (rank == BRICKMASK_MPI_ROOT) {
 #endif
+    /* Check endianness. */
+    union {
+      uint16_t u16;
+      uint8_t u8;
+    } ev;
+    ev.u16 = 0xbeef;
+#ifdef WITH_BIG_ENDIAN
+    if (ev.u8 == 0xef) {
+      P_EXT("little endian detected, "
+          "please recompile without -DWITH_BIG_ENDIAN\n");
+      BRICKMASK_QUIT(BRICKMASK_ERR_INIT);
+    }
+#else
+    if (ev.u8 == 0xbe) {
+      P_EXT("big endian detected, please recompile with -DWITH_BIG_ENDIAN\n");
+      BRICKMASK_QUIT(BRICKMASK_ERR_INIT);
+    }
+    else if (ev.u8 != 0xef) {
+      P_EXT("unsupported system endianness\n");
+      BRICKMASK_QUIT(MPI_ERR_UNKNOWN);
+    }
+#endif
+
     if (!(conf = load_conf(argc, argv))) {
       printf(FMT_FAIL);
       P_EXT("failed to load configuration parameters\n");

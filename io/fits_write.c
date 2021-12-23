@@ -227,9 +227,26 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
       }
 #endif
       /* Append maskbit value without considering endianness. */
-      memcpy(chunk + idx, (BRICKMASK_MASKBIT_DTYPE *) (data->mask) + i - 1,
+#if     BRICKMASK_WFITS_MTYPE == TBYTE || defined(WITH_BIG_ENDIAN)
+      memcpy(chunk + idx, ((BRICKMASK_MASKBIT_DTYPE *) data->mask) + i - 1,
           sizeof(BRICKMASK_MASKBIT_DTYPE));
       idx += sizeof(BRICKMASK_MASKBIT_DTYPE);
+#else
+      unsigned char *msk = ((unsigned char *) data->mask) +
+        (i - 1) * sizeof(BRICKMASK_MASKBIT_DTYPE);
+  #if   BRICKMASK_WFITS_MTYPE == TLONG
+      chunk[idx++] = msk[7];
+      chunk[idx++] = msk[6];
+      chunk[idx++] = msk[5];
+      chunk[idx++] = msk[4];
+  #elif BRICKMASK_WFITS_MTYPE == TINT
+      chunk[idx++] = msk[3];
+      chunk[idx++] = msk[2];
+  #else
+      chunk[idx++] = msk[1];
+      chunk[idx++] = msk[0];
+  #endif
+#endif
       /* Append subsample ID. */
 #if BRICKMASK_WFITS_SUBID == 1
       memcpy(chunk + idx, data->subid + i - 1, sizeof(unsigned char));
