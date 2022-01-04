@@ -94,10 +94,8 @@
 #define BRICKMASK_FITS_MAX_COLNAME      32
 /* Case sensitivity of FITS columns. */
 #define BRICKMASK_FITS_CASESEN          CASEINSEN
-/* Minimum FITS memory file size. */
-#define BRICKMASK_FITS_MIN_MEMSIZE      1048576
 /* Number of revisions for showing progress. */
-#define BRICKMASK_PROGRESS_NUM          100
+#define BRICKMASK_PROGRESS_NUM          20
 
 #ifdef EBOSS
 #define EBOSS_MASK_VALID(bit)           ((bit) & 1)
