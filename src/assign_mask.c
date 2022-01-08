@@ -126,7 +126,8 @@ static inline void world2pix(const WCS *wcs, const double ra, const double dec,
 
   theta = (theta >= 1 || theta <= -1) ? 0 :
       sqrt(1 - theta * theta) / theta * RAD_2_DEGREE;
-  double fac = theta / sqrt(phi1 * phi1 + phi2 * phi2);
+  double fac = (phi1 == 0 && phi2 == 0) ? 0 :
+      theta / sqrt(phi1 * phi1 + phi2 * phi2);
   double xx = fac * phi2;
   double yy = -fac * phi1;
 
@@ -325,7 +326,10 @@ int assign_mask(const BRICK *brick, DATA *data, const bool verbose) {
       }
 
       /* Assign maskbits. */
-      assign_bitcode_func(mask, data, imin, imax, subid[i]);
+      if (assign_bitcode_func(mask, data, imin, imax, subid[i])) {
+        free(fname); free(subid); mask_destroy(mask);
+        BRICKMASK_QUIT(BRICKMASK_ERR_MASK);
+      }
     }
     imin = imax;
 
