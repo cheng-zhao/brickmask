@@ -96,7 +96,8 @@
   #define FITS_WRITE_ABORT {                                            \
     P_ERR("cfitsio error: "); fits_report_error(stderr, status);        \
     status = 0; if (fp) { fits_close_file(fp, &status); status = 0; }   \
-    if (chunk) free(chunk); if (tab) free(tab);                         \
+    if (chunk) free(chunk);                                             \
+    if (tab) free(tab);                                                 \
     return BRICKMASK_ERR_FILE;                                          \
   }
 #else
@@ -104,7 +105,8 @@
     P_ERR("cfitsio error: "); fits_report_error(stderr, status);        \
     status = 0; if (fp) { fits_close_file(fp, &status); status = 0; }   \
     if (ofp) fits_close_file(ofp, &status);                             \
-    if (chunk) free(chunk); if (tab) free(tab);                         \
+    if (chunk) free(chunk);                                             \
+    if (tab) free(tab);                                                 \
     return BRICKMASK_ERR_FILE;                                          \
   }
 #endif
@@ -122,13 +124,14 @@ Function `fits_save_<BRICKMASK_MASKBIT_DTYPE><FITS_WRITE_SUBID_NAME>
 Arguments:
   * `fname`:    filename for the output FITS file;
   * `conf`:     structure for storing configurations;
-  * `data`:     structure for the data catalogue.
+  * `data`:     structure for the data catalogue;
+  * `icat`:      index of the output catalogue.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
 static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
     FITS_WRITE_SUBID_NAME, FITS_WRITE_OVERWRITE_NAME, FITS_WRITE_ALLCOL_NAME)
-    (const char *fname, const CONF *conf, const DATA *data) {
+    (const char *fname, const CONF *conf, const DATA *data, const int icat) {
   int status = 0;
   fitsfile *fp = NULL;
 #if BRICKMASK_WFITS_OVERWRITE == 1
@@ -140,9 +143,11 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
 
   /* Open the input file to read columns. */
 #if BRICKMASK_WFITS_OVERWRITE == 1
-  if (fits_open_data(&fp, conf->input, READWRITE, &status)) FITS_WRITE_ABORT;
+  if (fits_open_data(&fp, conf->input[icat], READWRITE, &status))
+    FITS_WRITE_ABORT;
 #else
-  if (fits_open_data(&fp, conf->input, READONLY, &status)) FITS_WRITE_ABORT;
+  if (fits_open_data(&fp, conf->input[icat], READONLY, &status))
+    FITS_WRITE_ABORT;
 #endif
 
   /* Get the total number of columns and rows. */
@@ -265,12 +270,12 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
       /* Append maskbit value with big endian. */
       const long didx = i + nread - 1;
 #if     BRICKMASK_WFITS_MTYPE == TBYTE || defined(WITH_BIG_ENDIAN)
-      memcpy(tab + idx, ((BRICKMASK_MASKBIT_DTYPE *) data->mask) + didx,
-          sizeof(BRICKMASK_MASKBIT_DTYPE));
+      memcpy(tab + idx, ((BRICKMASK_MASKBIT_DTYPE *) data->mask) +
+          data->iidx[icat] + didx, sizeof(BRICKMASK_MASKBIT_DTYPE));
       idx += sizeof(BRICKMASK_MASKBIT_DTYPE);
 #else
       unsigned char *msk = ((unsigned char *) data->mask) +
-        didx * sizeof(BRICKMASK_MASKBIT_DTYPE);
+        (data->iidx[icat] + didx) * sizeof(BRICKMASK_MASKBIT_DTYPE);
   #if   BRICKMASK_WFITS_MTYPE == TLONG
       tab[idx++] = msk[7];
       tab[idx++] = msk[6];
@@ -286,7 +291,7 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
 #endif
       /* Append subsample ID. */
 #if BRICKMASK_WFITS_SUBID == 1
-      tab[idx++] = data->subid[didx];
+      tab[idx++] = data->subid[data->iidx[icat] + didx];
 #endif
     }
 

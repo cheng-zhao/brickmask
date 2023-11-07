@@ -46,83 +46,8 @@
 }
 
 /*============================================================================*\
-                        Functions for saving FITS files
+                        Function for saving FITS files
 \*============================================================================*/
-
-/******************************************************************************
-Function `reorder_mask`:
-  Reorder maskbits, and reduce the length of the data type if applicable.
-Arguments:
-  * `data`:     structure for the the data catalogue.
-Return:
-  Zero on success; non-zero on error.
-******************************************************************************/
-static inline int reorder_mask(DATA *data) {
-  void *mask;
-  switch (data->mtype) {
-    case TBYTE:
-      if (!(mask = malloc(data->n * sizeof(unsigned char)))) {
-        P_ERR("failed to allocate memory for saving maskbits\n");
-        return BRICKMASK_ERR_MEMORY;
-      }
-      for (size_t i = 0; i < data->n; i++)
-        ((unsigned char *) mask)[data->idx[i]] = data->mask[i];
-      break;
-    case TSHORT:
-      if (!(mask = malloc(data->n * sizeof(uint16_t)))) {
-        P_ERR("failed to allocate memory for saving maskbits\n");
-        return BRICKMASK_ERR_MEMORY;
-      }
-      for (size_t i = 0; i < data->n; i++)
-        ((uint16_t *) mask)[data->idx[i]] = data->mask[i];
-      break;
-    case TINT:
-      if (!(mask = malloc(data->n * sizeof(uint32_t)))) {
-        P_ERR("failed to allocate memory for saving maskbits\n");
-        return BRICKMASK_ERR_MEMORY;
-      }
-      for (size_t i = 0; i < data->n; i++)
-        ((uint32_t *) mask)[data->idx[i]] = data->mask[i];
-      break;
-    case TLONG:
-      if (!(mask = malloc(data->n * sizeof(uint64_t)))) {
-        P_ERR("failed to allocate memory for saving maskbits\n");
-        return BRICKMASK_ERR_MEMORY;
-      }
-      for (size_t i = 0; i < data->n; i++)
-        ((uint64_t *) mask)[data->idx[i]] = data->mask[i];
-      break;
-    default:
-      P_ERR("unexpected data type for maskbits: %d\n", data->mtype);
-      return BRICKMASK_ERR_UNKNOWN;
-  }
-
-  free(data->mask);
-  data->mask = mask;
-  return 0;
-}
-
-/******************************************************************************
-Function `reorder_subid`:
-  Restore the original subsample ID before data sorting.
-Arguments:
-  * `data`:     structure for the the data catalogue.
-Return:
-  Zero on success; non-zero on error.
-******************************************************************************/
-static inline int reorder_subid(DATA *data) {
-  if (!data->subid) return 0;           /* subsample ID is not required */
-  unsigned char *subid = malloc(data->n * sizeof(unsigned char));
-  if (!subid) {
-    P_ERR("failed to allocate memory for saving subsample IDs\n");
-    return BRICKMASK_ERR_MEMORY;
-  }
-
-  for (size_t i = 0; i < data->n; i++) subid[data->idx[i]] = data->subid[i];
-  free(data->subid);
-  data->subid = subid;
-  return 0;
-}
 
 /******************************************************************************
 Function `force_output`:
@@ -380,11 +305,12 @@ Function `save_fits`:
   Write the data catalogue to a FITS file.
 Arguments:
   * `conf`:     structure for storing configurations;
-  * `data`:     structure for the the data catalogue.
+  * `data`:     structure for the the data catalogue;
+  * `idx`:      index of the output catalogue.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int save_fits(const CONF *conf, DATA *data) {
+int save_fits(const CONF *conf, const DATA *data, const int idx) {
   if (!conf) {
     P_ERR("configuration parameters are not loaded\n");
     return BRICKMASK_ERR_INIT;
@@ -394,18 +320,16 @@ int save_fits(const CONF *conf, DATA *data) {
     return BRICKMASK_ERR_INIT;
   }
 
-  /* Restore the orders of masks and subsample IDs. */
-  if (reorder_mask(data) || reorder_subid(data)) return BRICKMASK_ERR_MEMORY;
-
   /* Generate the filename for force overwriting. */
-  char *output = force_output(conf->output);
+  char *output = force_output(conf->output[idx]);
   if (!output) return BRICKMASK_ERR_MEMORY;
 
   /* Choose the function for saving the FITS catalogue. */
-  int (*save_fits_func) (const char *, const CONF *, const DATA *) = NULL;
+  int (*save_fits_func) (const char *, const CONF *, const DATA *, const int) =
+      NULL;
   switch (data->mtype) {
     case TBYTE:
-      if (strcmp(conf->input, conf->output)) {
+      if (strcmp(conf->input[idx], conf->output[idx])) {
         if (data->subid) {
           save_fits_func = (conf->ncol) ? fits_save_uint8_t_subid :
               fits_save_uint8_t_subid_all;
@@ -427,7 +351,7 @@ int save_fits(const CONF *conf, DATA *data) {
       }
       break;
     case TSHORT:
-      if (strcmp(conf->input, conf->output)) {
+      if (strcmp(conf->input[idx], conf->output[idx])) {
         if (data->subid) {
           save_fits_func = (conf->ncol) ? fits_save_uint16_t_subid :
               fits_save_uint16_t_subid_all;
@@ -449,7 +373,7 @@ int save_fits(const CONF *conf, DATA *data) {
       }
       break;
     case TINT:
-      if (strcmp(conf->input, conf->output)) {
+      if (strcmp(conf->input[idx], conf->output[idx])) {
         if (data->subid) {
           save_fits_func = (conf->ncol) ? fits_save_uint32_t_subid :
               fits_save_uint32_t_subid_all;
@@ -471,7 +395,7 @@ int save_fits(const CONF *conf, DATA *data) {
       }
       break;
     case TLONG:
-      if (strcmp(conf->input, conf->output)) {
+      if (strcmp(conf->input[idx], conf->output[idx])) {
         if (data->subid) {
           save_fits_func = (conf->ncol) ? fits_save_uint64_t_subid :
               fits_save_uint64_t_subid_all;
@@ -499,7 +423,7 @@ int save_fits(const CONF *conf, DATA *data) {
   }
 
   /* Save the FITS catalogue. */
-  if (save_fits_func(output, conf, data)) {
+  if (save_fits_func(output, conf, data, idx)) {
     free(output);
     return BRICKMASK_ERR_SAVE;
   }

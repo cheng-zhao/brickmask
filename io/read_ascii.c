@@ -195,23 +195,6 @@ Return:
 ******************************************************************************/
 static int read_ascii_col(const char *fname, const char comment,
     ASCII_COL_t *col, DATA *data) {
-  /* Allocate memory for the input catalogue. */
-  size_t nmax = BRICKMASK_DATA_INIT_NUM;
-  if (!(data->ra = malloc(nmax * sizeof(double))) ||
-      !(data->dec = malloc(nmax * sizeof(double))) ||
-      !(data->idx = malloc(nmax * sizeof(size_t)))) {
-    P_ERR("failed to allocate memory for the input catalog\n");
-    return BRICKMASK_ERR_MEMORY;
-  }
-
-  /* Allocate memory for the rest of the columns to be read. */
-  size_t rmax = BRICKMASK_CONTENT_INIT_SIZE;
-  size_t rsize = 0;
-  if (!(data->content = malloc(rmax * sizeof(char)))) {
-    P_ERR("failed to allocate memory for contents of the input catalog\n");
-    return BRICKMASK_ERR_MEMORY;
-  }
-
   /* Allocate memory for the chunk. */
   size_t cmax = BRICKMASK_FILE_CHUNK;
   char *chunk = malloc(cmax * sizeof(char));
@@ -227,8 +210,8 @@ static int read_ascii_col(const char *fname, const char comment,
     free(chunk);
     return BRICKMASK_ERR_FILE;
   }
-  size_t n, nread, nrest;
-  n = nrest = 0;
+  size_t nread, nrest;
+  nrest = 0;
 
   /* Start reading the file by chunk. */
   while ((nread = fread(chunk + nrest, sizeof(char), cmax - nrest, fp))) {
@@ -253,22 +236,23 @@ static int read_ascii_col(const char *fname, const char comment,
       }
 
       /* Copy output columns into memory. */
-      data->idx[n] = rsize;
+      data->cidx[data->n] = data->csize;
       if (col->ncol) {          /* copy given columns */
         for (int i = 0; i < col->ncol; i++) {
           const int c = col->cid[i];            /* current column number */
-          char *tmp = copy_column(data->content, &rsize, &rmax,
+          char *tmp = copy_column(data->content, &data->csize, &data->cmax,
               p + col->idx[c], col->idx[c + 1] - col->idx[c]);
           if (!tmp) {
-            P_ERR("failed to save columns of the input file\n");
+            P_ERR("failed to save columns of the input file: `%s'\n", fname);
             free(chunk); fclose(fp);
             return BRICKMASK_ERR_MEMORY;
           }
           data->content = tmp;
           /* Append whitespace to the last column of the original file. */
           if (c == col->max - 1) {
-            if (!(tmp = copy_column(data->content, &rsize, &rmax, " ", 1))) {
-              P_ERR("failed to save columns of the input file\n");
+            if (!(tmp = copy_column(data->content, &data->csize, &data->cmax,
+                " ", 1))) {
+              P_ERR("failed to save columns of the input file: `%s'\n", fname);
               free(chunk); fclose(fp);
               return BRICKMASK_ERR_MEMORY;
             }
@@ -277,60 +261,62 @@ static int read_ascii_col(const char *fname, const char comment,
         }
       }
       else {                    /* copy all columns */
-        char *tmp = copy_column(data->content, &rsize, &rmax, p, endl - p);
+        char *tmp = copy_column(data->content, &data->csize, &data->cmax,
+            p, endl - p);
         if (!tmp) {
-          P_ERR("failed to save columns of the input file\n");
+          P_ERR("failed to save columns of the input file: `%s'\n", fname);
           free(chunk); fclose(fp);
           return BRICKMASK_ERR_MEMORY;
         }
         data->content = tmp;
         /* Append white space to the end of the line. */
-        if (!(tmp = copy_column(data->content, &rsize, &rmax, " ", 1))) {
-          P_ERR("failed to save columns of the input file\n");
+        if (!(tmp = copy_column(data->content, &data->csize, &data->cmax,
+            " ", 1))) {
+          P_ERR("failed to save columns of the input file: `%s'\n", fname);
           free(chunk); fclose(fp);
           return BRICKMASK_ERR_MEMORY;
         }
         data->content = tmp;
       }
       /* Always append a '\0' at the end. */
-      *((char *) data->content + rsize++) = '\0';
+      *((char *) data->content + data->csize++) = '\0';
 
       /* Parse RA and Dec. */
-      if (sscanf(p + col->idx[col->c[0]], "%lf", data->ra + n) != 1 ||
-          sscanf(p + col->idx[col->c[1]], "%lf", data->dec + n) != 1) {
-        P_ERR("failed to read coordinates from line:\n%s\n", p);
+      if (sscanf(p + col->idx[col->c[0]], "%lf", data->ra + data->n) != 1 ||
+          sscanf(p + col->idx[col->c[1]], "%lf", data->dec + data->n) != 1) {
+        P_ERR("failed to read coordinates from file: `%s':\n%s\n", fname, p);
         free(chunk); fclose(fp);
         return BRICKMASK_ERR_FILE;
       }
 
       /* Enlarge memory for the data if necessary. */
-      if (++n >= nmax) {
-        if (SIZE_MAX / 2 < nmax) {
+      if (++data->n >= data->nmax) {
+        if (SIZE_MAX / 2 < data->nmax) {
           P_ERR("too many objects in the file: `%s'\n", fname);
           free(chunk); fclose(fp);
           return BRICKMASK_ERR_FILE;
         }
-        nmax *= 2;
-        double *tmp = realloc(data->ra, nmax * sizeof(double));
+        data->nmax *= 2;
+        double *tmp = realloc(data->ra, data->nmax * sizeof(double));
         if (!tmp) {
           P_ERR("failed to enlarge memory for the input catalog\n");
           free(chunk); fclose(fp);
           return BRICKMASK_ERR_MEMORY;
         }
         data->ra = tmp;
-        if (!(tmp = realloc(data->dec, nmax * sizeof(double)))) {
+        if (!(tmp = realloc(data->dec, data->nmax * sizeof(double)))) {
           P_ERR("failed to enlarge memory for the input catalog\n");
           free(chunk); fclose(fp);
           return BRICKMASK_ERR_MEMORY;
         }
         data->dec = tmp;
-        size_t *stmp = realloc(data->idx, nmax * sizeof(size_t));
+        size_t *stmp = realloc(data->cidx, data->nmax * sizeof(size_t));
         if (!stmp) {
           P_ERR("failed to enlarge memory for the input catalog\n");
           free(chunk); fclose(fp);
           return BRICKMASK_ERR_MEMORY;
         }
-        data->idx = stmp;
+        data->cidx = stmp;
       }
 
       /* Continue with the next line. */
@@ -341,7 +327,7 @@ static int read_ascii_col(const char *fname, const char comment,
     if (p == chunk) {
       char *tmp = chunk_resize(chunk, &cmax);
       if (!tmp) {
-        P_ERR("failed to enlarge memory for reading the file by chunk\n");
+        P_ERR("failed to enlarge memory for reading file by chunk\n");
         free(chunk); fclose(fp);
         return BRICKMASK_ERR_MEMORY;
       }
@@ -363,22 +349,6 @@ static int read_ascii_col(const char *fname, const char comment,
   }
   if (fclose(fp)) P_WRN("failed to close file: `%s'\n", fname);
 
-  if (!n) {
-    P_ERR("no valid object found in file: `%s'\n", fname);
-    return BRICKMASK_ERR_FILE;
-  }
-
-  /* Reduce the memory cost if applicable. */
-  double *dtmp = realloc(data->ra, n * sizeof(double));
-  if (dtmp) data->ra = dtmp;
-  dtmp = realloc(data->dec, n * sizeof(double));
-  if (dtmp) data->dec = dtmp;
-  size_t *stmp = realloc(data->idx, n * sizeof(size_t));
-  if (stmp) data->idx = stmp;
-  char *ctmp = realloc(data->content, rsize * sizeof(char));
-  if (ctmp) data->content = ctmp;
-  data->n = n;
-
   return 0;
 }
 
@@ -391,12 +361,13 @@ static int read_ascii_col(const char *fname, const char comment,
 Function `read_ascii`:
   Read data from the input ASCII catalogue.
 Arguments:
+  * `fname`:    filename of the input catalogue;
   * `conf`:     structure for storing configurations;
   * `data`:     structure for the input data catalogue.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int read_ascii(const CONF *conf, DATA *data) {
+int read_ascii(const char *fname, const CONF *conf, DATA *data) {
   if (!conf) {
     P_ERR("configuration parameters are not loaded\n");
     return BRICKMASK_ERR_INIT;
@@ -414,7 +385,7 @@ int read_ascii(const CONF *conf, DATA *data) {
   }
 
   /* Read the file. */
-  if (read_ascii_col(conf->input, conf->comment, col, data)) {
+  if (read_ascii_col(fname, conf->comment, col, data)) {
     ascii_col_destroy(col);
     return BRICKMASK_ERR_FILE;
   }

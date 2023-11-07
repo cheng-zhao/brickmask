@@ -45,12 +45,15 @@ typedef struct {
   int mnull;            /* MASKBIT_NULL         */
   int nsub;             /* Number of subsamples. */
   int *subid;           /* SUBSAMPLE_ID         */
-  char *input;          /* INPUT                */
+  char *ilist;          /* INPUT_FILES          */
+  char **input;         /* Input catalogs.      */
+  int ncat;             /* Number of input/output catalogues. */
   int ftype;            /* FILE_TYPE            */
   char comment;         /* ASCII_COMMENT        */
   char **cname;         /* COORD_COLUMN         */
   int cnum[2];          /* Column number of (RA,Dec) for ASCII input. */
-  char *output;         /* OUTPUT               */
+  char *olist;          /* OUTPUT_FILES         */
+  char **output;        /* Output catalogs.     */
   char **ocol;          /* OUTPUT_COLUMN        */
   int ncol;             /* Number of output columns. */
   int *onum;            /* Column numbers to be saved to the output. */

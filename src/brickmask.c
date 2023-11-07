@@ -15,6 +15,7 @@
 #include "load_conf.h"
 #include "get_brick.h"
 #include "data_io.h"
+#include "sort_data.h"
 #include "assign_mask.h"
 #include "save_file.h"
 #include <stdio.h>
@@ -88,7 +89,7 @@ int main(int argc, char *argv[]) {
 
     if (!(data = read_data(conf))) {
       printf(FMT_FAIL);
-      P_EXT("failed to read the input data catalog\n");
+      P_EXT("failed to read the input data catalogs\n");
       conf_destroy(conf); brick_destroy(brick);
       BRICKMASK_QUIT(BRICKMASK_ERR_FILE);
     }
@@ -128,9 +129,16 @@ int main(int argc, char *argv[]) {
 #endif
     brick_destroy(brick);
 
+    if (reorder_data(data)) {
+      printf(FMT_FAIL);
+      P_EXT("failed to restore the order of the input data\n");
+      conf_destroy(conf); data_destroy(data);
+      BRICKMASK_QUIT(BRICKMASK_ERR_MEMORY);
+    }
+
     if (save_data(conf, data)) {
       printf(FMT_FAIL);
-      P_EXT("failed to save the output data catalog\n");
+      P_EXT("failed to save the output data catalogs\n");
       conf_destroy(conf); data_destroy(data);
       BRICKMASK_QUIT(BRICKMASK_ERR_SAVE);
     }

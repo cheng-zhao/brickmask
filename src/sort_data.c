@@ -11,11 +11,12 @@
 
 *******************************************************************************/
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <fitsio.h>
 #include "define.h"
 #include "get_brick.h"
 #include "data_io.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 /*============================================================================*\
                     Functions for finding bricks of the data
@@ -150,6 +151,107 @@ typedef struct {
 
 
 /*============================================================================*\
+                 Functions for restoring the order of the data
+\*============================================================================*/
+
+/******************************************************************************
+Function `reorder_mask_reduce`:
+  Reorder maskbits, and reduce the length of the data type if applicable.
+Arguments:
+  * `data`:     structure for the the data catalogue.
+Return:
+  Zero on success; non-zero on error.
+******************************************************************************/
+static inline int reorder_mask_reduce(DATA *data) {
+  void *mask;
+  switch (data->mtype) {
+    case TBYTE:
+      if (!(mask = malloc(data->n * sizeof(unsigned char)))) {
+        P_ERR("failed to allocate memory for saving maskbits\n");
+        return BRICKMASK_ERR_MEMORY;
+      }
+      for (size_t i = 0; i < data->n; i++)
+        ((unsigned char *) mask)[data->idx[i]] = data->mask[i];
+      break;
+    case TSHORT:
+      if (!(mask = malloc(data->n * sizeof(uint16_t)))) {
+        P_ERR("failed to allocate memory for saving maskbits\n");
+        return BRICKMASK_ERR_MEMORY;
+      }
+      for (size_t i = 0; i < data->n; i++)
+        ((uint16_t *) mask)[data->idx[i]] = data->mask[i];
+      break;
+    case TINT:
+      if (!(mask = malloc(data->n * sizeof(uint32_t)))) {
+        P_ERR("failed to allocate memory for saving maskbits\n");
+        return BRICKMASK_ERR_MEMORY;
+      }
+      for (size_t i = 0; i < data->n; i++)
+        ((uint32_t *) mask)[data->idx[i]] = data->mask[i];
+      break;
+    case TLONG:
+      if (!(mask = malloc(data->n * sizeof(uint64_t)))) {
+        P_ERR("failed to allocate memory for saving maskbits\n");
+        return BRICKMASK_ERR_MEMORY;
+      }
+      for (size_t i = 0; i < data->n; i++)
+        ((uint64_t *) mask)[data->idx[i]] = data->mask[i];
+      break;
+    default:
+      P_ERR("unexpected data type for maskbits: %d\n", data->mtype);
+      return BRICKMASK_ERR_UNKNOWN;
+  }
+
+  free(data->mask);
+  data->mask = mask;
+  return 0;
+}
+
+/******************************************************************************
+Function `reorder_mask`:
+  Restore the original maskbits before data sorting.
+Arguments:
+  * `data`:     structure for the the data catalogue.
+Return:
+  Zero on success; non-zero on error.
+******************************************************************************/
+static inline int reorder_mask(DATA *data) {
+  uint64_t *mask = malloc(data->n * sizeof(uint64_t));
+  if (!mask) {
+    P_ERR("failed to allocate memory for saving maskbits\n");
+    return BRICKMASK_ERR_MEMORY;
+  }
+
+  for (size_t i = 0; i < data->n; i++) mask[data->idx[i]] = data->mask[i];
+  free(data->mask);
+  data->mask = mask;
+  return 0;
+}
+
+/******************************************************************************
+Function `reorder_subid`:
+  Restore the original subsample ID before data sorting.
+Arguments:
+  * `data`:     structure for the the data catalogue.
+Return:
+  Zero on success; non-zero on error.
+******************************************************************************/
+static inline int reorder_subid(DATA *data) {
+  if (!data->subid) return 0;           /* subsample ID is not required */
+  unsigned char *subid = malloc(data->n * sizeof(unsigned char));
+  if (!subid) {
+    P_ERR("failed to allocate memory for saving subsample IDs\n");
+    return BRICKMASK_ERR_MEMORY;
+  }
+
+  for (size_t i = 0; i < data->n; i++) subid[data->idx[i]] = data->subid[i];
+  free(data->subid);
+  data->subid = subid;
+  return 0;
+}
+
+
+/*============================================================================*\
                          Interface for sorting the data
 \*============================================================================*/
 
@@ -185,6 +287,37 @@ int sort_data(BRICK *brick, DATA *data, const bool verbose) {
     }
   }
   if (verbose) printf("  %zu bricks contain data points\n", data->nbrick);
+
+  printf(FMT_DONE);
+  return 0;
+}
+
+/******************************************************************************
+Function `reorder_data`:
+  Restore the original order of the input data sample.
+Arguments:
+  * `data`:     structure for the data catalogue.
+Return:
+  Zero on success; non-zero on error.
+******************************************************************************/
+int reorder_data(DATA *data) {
+  printf("Restoring the original order of the input data ...");
+  if (!data) {
+    P_ERR("the input data is not initialised\n");
+    return BRICKMASK_ERR_INIT;
+  }
+  fflush(stdout);
+
+  switch (data->fmt) {
+    case BRICKMASK_FFMT_ASCII:
+      if (reorder_mask(data)) return BRICKMASK_ERR_MEMORY;
+      break;
+    case BRICKMASK_FFMT_FITS:
+      if (reorder_mask_reduce(data)) return BRICKMASK_ERR_MEMORY;
+      break;
+  }
+
+  if (reorder_subid(data)) return BRICKMASK_ERR_MEMORY;
 
   printf(FMT_DONE);
   return 0;

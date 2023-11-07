@@ -18,7 +18,7 @@ endif
 # Settings for MPI
 ifeq ($(USE_MPI), T)
   TARGET=BRICKMASK_MPI
-  CFLAGS += -DMPI
+  CFLAGS += -DMPI -Wno-stringop-overflow
 else
   TARGET=BRICKMASK_NOMPI
 endif

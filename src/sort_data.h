@@ -1,5 +1,5 @@
 /*******************************************************************************
-* save_res.h: this file is part of the brickmask program.
+* sort_data.h: this file is part of the brickmask program.
 
 * brickmask: assign bit codes defined on Legacy Survey brick pixels
              to a catalogue with sky coordinates.
@@ -29,37 +29,36 @@
 
 *******************************************************************************/
 
-#ifndef __SAVE_RES_H__
-#define __SAVE_RES_H__
+#ifndef __SORT_DATA_H__
+#define __SORT_DATA_H__
 
+#include "get_brick.h"
 #include "data_io.h"
 
 /*============================================================================*\
-                    Interfaces for saving output catalogues
+                        Interfaces for sorting the data
 \*============================================================================*/
 
 /******************************************************************************
-Function `save_ascii`:
-  Write the data catalogue to an ASCII file.
+Function `sort_data`:
+  Sort the input data sample based on the brick IDs.
 Arguments:
-  * `conf`:     structure for storing configurations;
-  * `data`:     structure for the the data catalogue;
-  * `idx`:      index of the output catalogue.
+  * `brick`:    structure for bricks;
+  * `data`:     structure for the data catalogue;
+  * `verbose`:  indicate whether to show detailed outputs.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int save_ascii(const CONF *conf, const DATA *data, const int idx);
+int sort_data(BRICK *brick, DATA *data, const bool verbose);
 
 /******************************************************************************
-Function `save_fits`:
-  Write the data catalogue to a FITS file.
+Function `reorder_data`:
+  Restore the original order of the input data sample.
 Arguments:
-  * `conf`:     structure for storing configurations;
-  * `data`:     structure for the the data catalogue;
-  * `idx`:      index of the output catalogue.
+  * `data`:     structure for the data catalogue.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int save_fits(const CONF *conf, const DATA *data, const int idx);
+int reorder_data(DATA *data);
 
 #endif

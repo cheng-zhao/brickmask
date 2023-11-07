@@ -45,9 +45,11 @@ SUBSAMPLE_ID  = [0,1,2,3]
     # 0 -> eboss21; 1 -> eboss22; 2 -> eboss23; 3 -> eboss25.
 ```
 
-### `INPUT` (`-i` / `--input`)
+### `INPUT_FILES` (`-i` / `--input`)
 
-Filename of the input catalogue, which must contain right ascensions (RA) and declinations (Dec) of objects. Note that an ASCII-format catalogue can be passed via pipe, but in general a FITS-format catalogue cannot.
+Files containing paths of all input catalogues to be added maskbits. Each row of the file sets the path of an input catalogue. Note that each white space in the path should be escaped by a leading '`\`' character.
+
+Each input catalogue must contain right ascensions (RA) and declinations (Dec) of objects. Note that an ASCII-format catalogue can be passed via named pipe, but in general a FITS-format catalogue cannot.
 
 ### `FILE_TYPE` (`-f` / `--file-type`)
 
@@ -74,9 +76,11 @@ COORD_COLUMN = [RA,DEC]
     # FITS: "RA" for RA, "DEC" for Dec
 ```
 
-### `OUTPUT` (`-o` / `--output`)
+### `OUTPUT_FILES` (`-o` / `--output`)
 
-Filename of the output catalogue. It is safe to specify the same filename as `INPUT`, though this is not recommended. It can be a pipe for the ASCII-format catalogue, but cannot for FITS format.
+Files containing paths of all output catalogues to be added maskbits. Each row of the file sets the path of an output catalogue. Note that each white space in the path should be escaped by a leading '`\`' character.
+
+It is safe to specify the same filename as `INPUT`. It can be a named pipe for the ASCII-format catalogue, but cannot for FITS format.
 
 ### `OUTPUT_COLUMN` (`-e` / `--output-col`)
 

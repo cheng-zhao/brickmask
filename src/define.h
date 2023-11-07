@@ -55,6 +55,7 @@
 #endif
 
 #define BRICKMASK_MAX_SUBID             UCHAR_MAX
+#define BRICKMASK_MAX_NUM_CAT           65536
 #define BRICKMASK_MAX_COLUMN            65536
 
 /* Priority of parameters from different sources. */

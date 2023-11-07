@@ -32,10 +32,9 @@
 #ifndef __GET_BRICK_H__
 #define __GET_BRICK_H__
 
-#include "load_conf.h"
-#include "data_io.h"
 #include <stddef.h>
 #include <stdint.h>
+#include "load_conf.h"
 
 /*============================================================================*\
                            Data structure for bricks
@@ -73,18 +72,6 @@ Return:
   Address of the structure for bricks on success; NULL on error.
 ******************************************************************************/
 BRICK *get_brick(const CONF *conf);
-
-/******************************************************************************
-Function `sort_data`:
-  Sort the input data sample based on the brick IDs.
-Arguments:
-  * `brick`:    structure for bricks;
-  * `data`:     structure for the data catalogue;
-  * `verbose`:  indicate whether to show detailed outputs.
-Return:
-  Zero on success; non-zero on error.
-******************************************************************************/
-int sort_data(BRICK *brick, DATA *data, const bool verbose);
 
 /******************************************************************************
 Function `brick_destroy`:

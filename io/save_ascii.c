@@ -236,11 +236,12 @@ Function `save_ascii`:
   Write the data catalogue to an ASCII file.
 Arguments:
   * `conf`:     structure for storing configurations;
-  * `data`:     structure for the the data catalogue.
+  * `data`:     structure for the the data catalogue;
+  * `idx`:      index of the output catalogue.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int save_ascii(const CONF *conf, const DATA *data) {
+int save_ascii(const CONF *conf, const DATA *data, const int idx) {
   if (!conf) {
     P_ERR("configuration parameters are not loaded\n");
     return BRICKMASK_ERR_INIT;
@@ -253,16 +254,16 @@ int save_ascii(const CONF *conf, const DATA *data) {
   /* Initialise the interface for writing files. */
   OFILE *ofile = output_init();
   if (!ofile) return BRICKMASK_ERR_FILE;
-  if (output_newfile(ofile, conf->output)) {
+  if (output_newfile(ofile, conf->output[idx])) {
     output_destroy(ofile);
     return BRICKMASK_ERR_FILE;
   }
 
   /* Write the catalog. */
   const char *content = data->content;
-  for (size_t i = 0; i < data->n; i++) {
+  for (size_t i = data->iidx[idx]; i < data->iidx[idx + 1]; i++) {
     /* Write columns of the original file. */
-    WRITE_LINE(ofile, "%s", content + data->idx[i]);
+    WRITE_LINE(ofile, "%s", content + data->cidx[i]);
 
     /* Write maskbits. */
     WRITE_LINE(ofile, "%" PRIu64, data->mask[i]);

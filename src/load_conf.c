@@ -11,16 +11,17 @@
 
 *******************************************************************************/
 
-#include "define.h"
-#include "load_conf.h"
-#include "data_io.h"
-#include "libcfg.h"
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
+#include "define.h"
+#include "load_conf.h"
+#include "data_io.h"
+#include "read_file.h"
+#include "libcfg.h"
 
 /*============================================================================*\
                            Macros for error handling
@@ -100,16 +101,16 @@ Assign maskbit codes to a catalog with sky coordinates.\n\
         Set the maskbit code for objects outside all maskbit bricks\n\
   -s, --sample-id       " FMT_KEY(SUBSAMPLE_ID) "    Integer array\n\
         Set IDs of subsamples\n\
-  -i, --input           " FMT_KEY(INPUT) "           String\n\
-        Specify the input catalog\n\
+  -i, --input           " FMT_KEY(INPUT_FILES) "     String\n\
+        Specify the text file with paths of all input catalogs\n\
   -f, --file-type       " FMT_KEY(FILE_TYPE) "       Integer\n\
         Specify the file type of the input catalog\n\
       --comment         " FMT_KEY(ASCII_COMMENT) "   Character\n\
         Specify the comment symbol for ASCII-format input catalog\n\
   -C, --coord-col       " FMT_KEY(COORD_COLUMN) "    String array\n\
         Specify columns for RA and Dec in the input catalog\n\
-  -o, --output          " FMT_KEY(OUTPUT) "          String\n\
-        Set the output catalog\n\
+  -o, --output          " FMT_KEY(OUTPUT_FILES) "    String\n\
+        Specify the text file with paths of all output catalogs\n\
   -e, --output-col      " FMT_KEY(OUTPUT_COLUMN) "   String array\n\
         Set columns to be written to the output catalog\n\
   -M, --mask-col        " FMT_KEY(MASKBIT_COLUMN) "  String\n\
@@ -150,16 +151,20 @@ MASKBIT_FILES   = \n\
     # Each row of the ASCII files specifies the path of a maskbit file.\n\
     # Each space in the paths must be escaped by a leading '\\' character.\n\
     # Name of the bricks must present in the filenames.\n\
-    # Lines starting with '#' are omitted.\n\
+    # Lines starting with '%c' are omitted.\n\
 MASKBIT_NULL    = \n\
     # Integer, bit code for objects outisde all maskbit bricks (unset: %d).\n\
 SUBSAMPLE_ID    = \n\
     # If set, the IDs of subsamples are saved to the output as an extra column.\n\
     # Integer or integer array, same dimension as `MASKBIT_FILES`.\n\
-INPUT           = \n\
-    # Filename of the input data catalog.\n\
+INPUT_FILES     = \n\
+    # Filename of an ASCII file storing paths of input catalogs.\n\
+    # Formats and columns of all input files must be identical.\n\
+    # Each row of the ASCII file specifies the path of an input catalog.\n\
+    # Each space in the paths must be escaped by a leading '\\' character.\n\
+    # Lines starting with '%c' are omitted.\n\
 FILE_TYPE       = \n\
-    # Integer, format of the input catalog (default: %d).\n\
+    # Integer, format of the input and output catalogs (default: %d).\n\
     # The allowed values are:\n\
     # * %d: ASCII text file;\n\
     # * %d: FITS table.\n\
@@ -169,8 +174,12 @@ COORD_COLUMN    = \n\
     # 2-element integer or string array, columns of (RA,Dec) for `INPUT`.\n\
     # They must be integers indicating the column numbers (starting from 1) for\n\
     # an ASCII file, or strings indicating the column names for a FITS table.\n\
-OUTPUT          = \n\
-    # Filename for the output catalog, with the same format as `INPUT`.\n\
+OUTPUT_FILES    = \n\
+    # Filename of an ASCII file storing paths of output catalogs.\n\
+    # Each row of the ASCII file specifies the path of an output catalog that\n\
+    # corresponds to the input catalog in `INPUT_FILES` at the same row.\n\
+    # Each space in the paths must be escaped by a leading '\\' character.\n\
+    # Lines starting with '%c' are omitted.\n\
 OUTPUT_COLUMN   = \n\
     # Integer or String arrays, columns to be saved to `OUTPUT`.\n\
     # If not set, all columns of `INPUT` are saved in the original order.\n\
@@ -186,10 +195,10 @@ OVERWRITE       = \n\
     # * negative: notify at most this number of times for existing files.\n\
 VERBOSE         = \n\
     # Boolean option, indicate whether to show detailed outputs (unset: %c).\n",
-      DEFAULT_MASK_NULL, DEFAULT_FILE_TYPE,
-      BRICKMASK_FFMT_ASCII, BRICKMASK_FFMT_FITS,
+      BRICKMASK_READ_COMMENT, DEFAULT_MASK_NULL, BRICKMASK_READ_COMMENT,
+      DEFAULT_FILE_TYPE, BRICKMASK_FFMT_ASCII, BRICKMASK_FFMT_FITS,
       DEFAULT_ASCII_COMMENT ? DEFAULT_ASCII_COMMENT : '\'',
-      DEFAULT_ASCII_COMMENT ? "')" : ")",
+      DEFAULT_ASCII_COMMENT ? "')" : ")", BRICKMASK_READ_COMMENT,
       DEFAULT_OVERWRITE, DEFAULT_VERBOSE ? 'T' : 'F');
   exit(0);
 }
@@ -208,8 +217,8 @@ Return:
 static CONF *conf_init(void) {
   CONF *conf = calloc(1, sizeof *conf);
   if (!conf) return NULL;
-  conf->fconf = conf->flist = conf->input = conf->output = conf->mcol = NULL;
-  conf->fmask = conf->cname = conf->ocol = NULL;
+  conf->fconf = conf->flist = conf->ilist = conf->olist = conf->mcol = NULL;
+  conf->fmask = conf->input = conf->cname = conf->output = conf->ocol = NULL;
   conf->subid = conf->onum = NULL;
   return conf;
 }
@@ -245,11 +254,11 @@ static cfg_t *conf_read(CONF *conf, const int argc, char *const *argv) {
     {'m', "mask-file"   , "MASKBIT_FILES"  , CFG_ARRAY_STR , &conf->fmask   },
     {'n', "mask-null"   , "MASKBIT_NULL"   , CFG_DTYPE_INT , &conf->mnull   },
     {'s', "sample-id"   , "SUBSAMPLE_ID"   , CFG_ARRAY_INT , &conf->subid   },
-    {'i', "input"       , "INPUT"          , CFG_DTYPE_STR , &conf->input   },
+    {'i', "input"       , "INPUT_FILES"    , CFG_DTYPE_STR , &conf->ilist   },
     {'f', "file-type"   , "FILE_TYPE"      , CFG_DTYPE_INT , &conf->ftype   },
     { 0 , "comment"     , "ASCII_COMMENT"  , CFG_DTYPE_CHAR, &conf->comment },
     {'C', "coord-col"   , "COORD_COLUMN"   , CFG_ARRAY_STR , &conf->cname   },
-    {'o', "output"      , "OUTPUT"         , CFG_DTYPE_STR , &conf->output  },
+    {'o', "output"      , "OUTPUT_FILES"   , CFG_DTYPE_STR , &conf->olist   },
     {'e', "output-col"  , "OUTPUT_COLUMN"  , CFG_ARRAY_STR , &conf->ocol    },
     {'M', "mask-col"    , "MASKBIT_COLUMN" , CFG_DTYPE_STR , &conf->mcol    },
     {'O', "overwrite"   , "OVERWRITE"      , CFG_DTYPE_INT , &conf->ovwrite },
@@ -415,9 +424,23 @@ static int conf_verify(const cfg_t *cfg, CONF *conf) {
     }
   }
 
-  /* INPUT */
-  CHECK_EXIST_PARAM(INPUT, cfg, &conf->input);
-  if ((e = check_input(conf->input, "INPUT"))) return e;
+  /* INPUT_FILES */
+  CHECK_EXIST_PARAM(INPUT_FILES, cfg, &conf->ilist);
+  if ((e = check_input(conf->ilist, "INPUT_FILES"))) return e;
+
+  /* Read filenames of input catalogues. */
+  size_t ncat;
+  if (read_fname(conf->ilist, &conf->input, &ncat) == 0)
+    return BRICKMASK_ERR_FILE;
+  if (ncat > BRICKMASK_MAX_NUM_CAT) {
+    P_ERR("number of files in " FMT_KEY(INPUT_FILES) " cannot exceed %d\n",
+        BRICKMASK_MAX_NUM_CAT);
+    return BRICKMASK_ERR_FILE;
+  }
+  conf->ncat = ncat;
+  for (int i = 0; i < conf->ncat; i++) {
+    if ((e = check_input(conf->input[i], "INPUT_FILES"))) return e;
+  }
 
   /* FILE_TYPE */
   if (!cfg_is_set(cfg, &conf->ftype)) conf->ftype = DEFAULT_FILE_TYPE;
@@ -469,9 +492,22 @@ static int conf_verify(const cfg_t *cfg, CONF *conf) {
   /* OVERWRITE */
   if (!cfg_is_set(cfg, &conf->ovwrite)) conf->ovwrite = DEFAULT_OVERWRITE;
 
-  /* OUTPUT */
-  CHECK_EXIST_PARAM(OUTPUT, cfg, &conf->output);
-  if ((e = check_output(conf->output, "OUTPUT", conf->ovwrite))) return e;
+  /* OUTPUT_FILES */
+  CHECK_EXIST_PARAM(OUTPUT_FILES, cfg, &conf->olist);
+  if  ((e = check_input(conf->olist, "OUTPUT_FILES"))) return e;
+
+  /* Read filenames of output catalogs. */
+  if (read_fname(conf->olist, &conf->output, &ncat) == 0)
+    return BRICKMASK_ERR_FILE;
+  if ((size_t) conf->ncat != ncat) {
+    P_ERR("different numbers of files in " FMT_KEY(INPUT_FILES) " and "
+        FMT_KEY(OUTPUT_FILES) "\n");
+    return BRICKMASK_ERR_FILE;
+  }
+  for (int i = 0; i < conf->ncat; i++) {
+    if ((e = check_output(conf->output[i], "OUTPUT_FILES", conf->ovwrite)))
+      return e;
+  }
 
   /* OUTPUT_COLUMN */
   if ((conf->ncol = cfg_get_size(cfg, &conf->ocol))) {
@@ -605,7 +641,7 @@ static void conf_print(const CONF *conf) {
     printf("\n  SUBSAMPLE_ID    = %d", conf->subid[0]);
     for (int i = 1; i < conf->nsub; i++) printf(" , %d", conf->subid[i]);
   }
-  printf("\n  INPUT           = %s", conf->input);
+  printf("\n  INPUT_FILES     = %s", conf->ilist);
 
   const char *ftype[2] = {"ASCII", "FITS"};
   printf("\n  FILE_TYPE       = %d (%s)", conf->ftype, ftype[conf->ftype]);
@@ -616,7 +652,7 @@ static void conf_print(const CONF *conf) {
   }
   else printf("\n  COORD_COLUMN    = %s , %s", conf->cname[0], conf->cname[1]);
 
-  printf("\n  OUTPUT          = %s", conf->output);
+  printf("\n  OUTPUT_FILES    = %s", conf->olist);
   if (conf->ncol) {
     if (conf->ftype == BRICKMASK_FFMT_ASCII) {
       printf("\n  OUTPUT_COLUMN   = %d", conf->onum[0]);
@@ -628,7 +664,7 @@ static void conf_print(const CONF *conf) {
     }
   }
   if (conf->ftype == BRICKMASK_FFMT_FITS)
-    printf("\n  MASKBIT_COLUMN  = %s\n", conf->mcol);
+    printf("\n  MASKBIT_COLUMN  = %s", conf->mcol);
 
   printf("\n  OVERWRITE       = %d\n", conf->ovwrite);
 }
@@ -687,9 +723,11 @@ void conf_destroy(CONF *conf) {
   FREE_ARRAY(conf->flist);
   FREE_STR_ARRAY(conf->fmask);
   FREE_ARRAY(conf->subid);
-  FREE_ARRAY(conf->input);
+  FREE_ARRAY(conf->ilist);
+  FREE_STR_ARRAY(conf->input);
   FREE_STR_ARRAY(conf->cname);
-  FREE_ARRAY(conf->output);
+  FREE_ARRAY(conf->olist);
+  FREE_STR_ARRAY(conf->output);
   FREE_STR_ARRAY(conf->ocol);
   FREE_ARRAY(conf->onum);
   FREE_ARRAY(conf->mcol);

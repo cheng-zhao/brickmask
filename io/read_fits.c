@@ -112,18 +112,13 @@ Function `get_fits_coord`:
 Arguments:
   * `conf`:     structure for storing configurations;
   * `data`:     structure for the input data catalogue;
+  * `ndata`:    number of rows to be read;
   * `fp`:       pointer to the opened FITS file.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-static int get_fits_coord(const CONF *conf, DATA *data, fitsfile *fp) {
-  if (!(data->ra = malloc(data->n * sizeof(double))) ||
-      !(data->dec = malloc(data->n * sizeof(double))) ||
-      !(data->idx = malloc(data->n * sizeof(size_t)))) {
-    P_ERR("failed to allocate memory for coordinates\n");
-    return BRICKMASK_ERR_MEMORY;
-  }
-
+static int get_fits_coord(const CONF *conf, DATA *data, const size_t ndata,
+    fitsfile *fp) {
   /* Get columns for RA and Dec. */
   int status = 0;
   int col[2];
@@ -146,19 +141,19 @@ static int get_fits_coord(const CONF *conf, DATA *data, fitsfile *fp) {
 
   /* Read the file and retrieve coordinates. */
   long nread = 1;
-  long nrest = data->n;
+  long nrest = ndata;
   int anynul;
   while (nrest) {
     long nrow = (nstep < nrest) ? nstep : nrest;
-    if (fits_read_col_dbl(fp, col[0], nread, 1, nrow, 0, data->ra + nread - 1,
-        &anynul, &status)) FITS_ABORT;
-    if (fits_read_col_dbl(fp, col[1], nread, 1, nrow, 0, data->dec + nread - 1,
-        &anynul, &status)) FITS_ABORT;
+    if (fits_read_col_dbl(fp, col[0], nread, 1, nrow, 0,
+        data->ra + (data->n + nread - 1), &anynul, &status)) FITS_ABORT;
+    if (fits_read_col_dbl(fp, col[1], nread, 1, nrow, 0,
+        data->dec + (data->n + nread - 1), &anynul, &status)) FITS_ABORT;
     nread += nrow;
     nrest -= nrow;
   }
 
-  for (size_t i = 0; i < data->n; i++) data->idx[i] = i;
+  data->n += ndata;
   return 0;
 }
 
@@ -264,12 +259,13 @@ int read_brick(const char *fname, BRICK *brick) {
 Function `read_fits`:
   Read data from the input FITS catalogue.
 Arguments:
+  * `fname`:    filename of the input catalogue;
   * `conf`:     structure for storing configurations;
   * `data`:     structure for the input data catalogue.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int read_fits(const CONF *conf, DATA *data) {
+int read_fits(const char *fname, const CONF *conf, DATA *data) {
   if (!conf) {
     P_ERR("configuration parameters are not loaded\n");
     return BRICKMASK_ERR_INIT;
@@ -282,7 +278,7 @@ int read_fits(const CONF *conf, DATA *data) {
   /* Open the file for reading. */
   int status = 0;
   fitsfile *fp = NULL;
-  if (fits_open_data(&fp, conf->input, READONLY, &status)) FITS_ABORT;
+  if (fits_open_data(&fp, fname, READONLY, &status)) FITS_ABORT;
 
   /* Check if the maskbit and subsample ID columns are alread in the file. */
   int col = 0;
@@ -312,14 +308,28 @@ int read_fits(const CONF *conf, DATA *data) {
   /* Get the number of objects. */
   long ndata = 0;
   if (fits_get_num_rows(fp, &ndata, &status)) FITS_ABORT;
-  if (!(data->n = ndata)) {
-    P_ERR("no valid object found in file: `%s'\n", conf->input);
-    return BRICKMASK_ERR_FILE;
+  if (!ndata) {
+    if (fits_close_file(fp, &status)) FITS_ABORT;
+    return 0;
   }
 
+  /* Allocate memory. */
+  double *tmp[2];
+  if (!(tmp[0] = realloc(data->ra, (data->n + ndata) * sizeof(double))) ||
+      !(tmp[1] = realloc(data->dec, (data->n + ndata) * sizeof(double)))) {
+    P_ERR("failed to allocate memory for the input data catalog\n");
+    if (tmp[0]) free(tmp[0]);
+    fits_close_file(fp, &status);
+    return BRICKMASK_ERR_MEMORY;
+  }
+  data->ra = tmp[0];
+  data->dec = tmp[1];
+
   /* Get properties of output columns. */
-  if (get_fits_col(conf, data, fp) || get_fits_coord(conf, data, fp))
-    return BRICKMASK_ERR_FILE;
+  if (!data->content && get_fits_col(conf, data, fp)) return BRICKMASK_ERR_FILE;
+
+  /* Read coordinates. */
+  if (get_fits_coord(conf, data, ndata, fp)) return BRICKMASK_ERR_FILE;
 
   /* Close file. */
   if (fits_close_file(fp, &status)) FITS_ABORT;

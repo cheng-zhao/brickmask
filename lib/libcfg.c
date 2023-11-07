@@ -520,7 +520,7 @@ static cfg_parse_return_t cfg_parse_line(char *line, const size_t len,
     char **key, char **value, cfg_parse_state_t state) {
   if (!line || *line == '\0' || len == 0) return CFG_PARSE_PASS;
   char quote = '\0';            /* handle quotation marks */
-  char *newline;                /* handle line continuation */
+  char *newline = line;         /* handle line continuation */
   for (size_t i = 0; i < len; i++) {
     char c = line[i];
     switch (state) {

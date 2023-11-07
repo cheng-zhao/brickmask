@@ -51,11 +51,15 @@ typedef struct {
   BRICKMASK_ffmt_t fmt; /* format of the input data catalogue           */
   int mtype;            /* data type of maskbits                        */
   size_t n;             /* number of objects read from file             */
+  size_t nmax;          /* number of objects allocated for the data     */
+  size_t csize;         /* size of the content read from file           */
+  size_t cmax;          /* number of bytes allocated for the content    */
   size_t nbrick;        /* total number of bricks containing the data   */
   double *ra;           /* right ascension                              */
   double *dec;          /* declination                                  */
-  size_t *idx;          /* ASCII: index for the rest of the columns
-                           FITS:  index of the data before sorting      */
+  size_t *idx;          /* index of the data before sorting             */
+  size_t *cidx;         /* ASCII: index for the rest of the columns     */
+  size_t *iidx;         /* index range for different input catalogues   */
   long *id;             /* brick ID, signed type for sorting comparison */
   uint64_t *mask;       /* maskbit value                                */
   unsigned char *subid; /* ID of the subsample                          */

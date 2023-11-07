@@ -45,12 +45,13 @@
 Function `read_ascii`:
   Read data from the input ASCII catalogue.
 Arguments:
+  * `fname`:    filename of the input catalogue;
   * `conf`:     structure for storing configurations;
   * `data`:     structure for the input data catalog.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int read_ascii(const CONF *conf, DATA *data);
+int read_ascii(const char *fname, const CONF *conf, DATA *data);
 
 /******************************************************************************
 Function `read_fname`:
@@ -79,12 +80,13 @@ int read_brick(const char *fname, BRICK *brick);
 Function `read_fits`:
   Read data from the input FITS catalogue.
 Arguments:
+  * `fname`:    filename of the input catalogue;
   * `conf`:     structure for storing configurations;
   * `data`:     structure for the input data catalogue.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int read_fits(const CONF *conf, DATA *data);
+int read_fits(const char *fname, const CONF *conf, DATA *data);
 
 /******************************************************************************
 Function `read_mask`:
