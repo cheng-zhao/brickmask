@@ -106,7 +106,7 @@
 
 #ifdef MPI
 #define BRICKMASK_MPI_ROOT              0       /* root rank of MPI */
-#define BRICKMASK_MAX_DATA              INT_MAX /* maximum number of objects */
+#define BRICKMASK_MAX_DATA              INT_MAX /* maximum number of data */
 #endif
 
 /*============================================================================*\

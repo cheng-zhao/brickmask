@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <unistd.h>
 #ifdef MPI
 #include <mpi.h>
 #define BRICKMASK_QUIT(status)  MPI_Abort(MPI_COMM_WORLD, status); exit(status);
@@ -305,6 +306,12 @@ int assign_mask(const BRICK *brick, DATA *data, const bool verbose) {
     }
 
     for (int i = 0; i < nsp; i++) {
+      /* Check if the maskbit file exists. */
+      if (access(fname[i], R_OK)) {
+        P_WRN("cannot access maskbit file: `%s'\n", fname[i]);
+        continue;
+      }
+
       /* Read maskbits for each subsample. */
       if (read_mask(fname[i], mask)) {
         free(fname); free(subid); mask_destroy(mask);
