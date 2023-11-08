@@ -56,28 +56,42 @@ static void mpi_bcast_brick(BRICK **brick) {
     MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
   }
   BRICK *b = *brick;
+  size_t len;           /* length of brick path */
   if (rank != BRICKMASK_MPI_ROOT) {
     b->ra1 = b->ra2 = b->dec1 = b->dec2 = NULL;
     b->name = NULL;
-    b->subid = NULL;
-    b->nmask = NULL;
-    b->fmask = NULL;
-    b->mlen = NULL;
+    b->photsys = NULL;
+  }
+  else {
+    len = strlen(b->bpath) + 1;
   }
 
+  /* Setup custom MPI datatype for broadcasting. */
+  MPI_Datatype dtypes[5] =
+      {MY_MPI_SIZE_T, MY_MPI_SIZE_T, MPI_UINT64_T, MPI_UINT64_T, MPI_INT};
+  int lengths[5] = {1, 1, 1, 1, 1};
+  MPI_Aint addrs[5];
+  MPI_Datatype send_type;
+
   /* Broadcast number of bricks and length of brick names. */
-  MPI_Request req[3];
-  if (MPI_Ibcast(&b->n, 1, MY_MPI_SIZE_T, BRICKMASK_MPI_ROOT,
-      MPI_COMM_WORLD, req) || MPI_Ibcast(&b->nlen, 1, MPI_INT,
-      BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 1) ||
-      MPI_Waitall(2, req, MPI_STATUSES_IGNORE)) {
+  if (MPI_Get_address(&len, addrs) ||
+      MPI_Get_address(&(b->n), addrs + 1) ||
+      MPI_Get_address(&(b->mnull), addrs + 2) ||
+      MPI_Get_address(&(b->enull), addrs + 3) ||
+      MPI_Get_address(&(b->nlen), addrs + 4) ||
+      MPI_Type_create_struct(5, lengths, addrs, dtypes, &send_type) ||
+      MPI_Type_commit(&send_type) ||
+      MPI_Bcast(MPI_BOTTOM, 1, send_type, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+      MPI_Type_free(&send_type)) {
     P_ERR("failed to broadcast brick information\n");
     MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
   }
 
-  /* Allocate memory for brick names. */
+  /* Allocate memory for photsys, bpath, and brick names. */
   if (rank != BRICKMASK_MPI_ROOT) {
-    if (!(b->name = malloc(b->n * sizeof(char *)))) {
+    if (!(b->photsys = malloc(b->n * sizeof(unsigned char))) ||
+        !(b->bpath = calloc(len, sizeof(char))) ||
+        !(b->name = malloc(b->n * sizeof(char *)))) {
       P_ERR("failed to allocate memory for task-private brick information\n");
     }
     for (size_t i = 0; i < b->n; i++) b->name[i] = NULL;
@@ -87,11 +101,19 @@ static void mpi_bcast_brick(BRICK **brick) {
     }
   }
 
-  /* Broadcast brick names and number of subsamples. */
-  if (MPI_Ibcast(b->name[0], b->n * (b->nlen + 1), MPI_CHAR,
-      BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req) || MPI_Ibcast(&b->nsp, 1,
-      MPI_INT, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 1) ||
-      MPI_Waitall(2, req, MPI_STATUSES_IGNORE)) {
+  /* Broadcast photsys and brick names. */
+  dtypes[0] = MPI_UNSIGNED_CHAR;
+  dtypes[1] = dtypes[2] = MPI_CHAR;
+  lengths[0] = b->n;
+  lengths[1] = len;
+  lengths[2] = b->n * (b->nlen + 1);
+  if (MPI_Get_address(b->photsys, addrs) ||
+      MPI_Get_address(b->bpath, addrs + 1) ||
+      MPI_Get_address(b->name[0], addrs + 2) ||
+      MPI_Type_create_struct(3, lengths, addrs, dtypes, &send_type) ||
+      MPI_Type_commit(&send_type) ||
+      MPI_Bcast(MPI_BOTTOM, 1, send_type, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+      MPI_Type_free(&send_type)) {
     P_ERR("failed to broadcast brick information\n");
     MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
   }
@@ -100,73 +122,6 @@ static void mpi_bcast_brick(BRICK **brick) {
   if (rank != BRICKMASK_MPI_ROOT) {
     for (size_t i = 1; i < b->n; i++)
       b->name[i] = b->name[0] + i * (b->nlen + 1);
-
-    if (!(b->subid = malloc(b->nsp * sizeof(int))) ||
-        !(b->nmask = malloc(b->nsp * sizeof(size_t))) ||
-        !(b->mlen = malloc(b->nsp * sizeof(size_t))) ||
-        !(b->fmask = malloc(b->nsp * sizeof(char **)))) {
-      P_ERR("failed to allocate memory for task-private brick information\n");
-      MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
-    }
-    for (int i = 0; i < b->nsp; i++) b->fmask[i] = NULL;
-  }
-
-  /* Broadcast subsample IDs, and number & length of maskbit files. */
-  if (MPI_Ibcast(b->subid, b->nsp, MPI_INT, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD,
-      req) || MPI_Ibcast(b->nmask, b->nsp, MY_MPI_SIZE_T, BRICKMASK_MPI_ROOT,
-      MPI_COMM_WORLD, req + 1) || MPI_Ibcast(b->mlen, b->nsp, MY_MPI_SIZE_T,
-      BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 2) ||
-      MPI_Waitall(3, req, MPI_STATUSES_IGNORE)) {
-    P_ERR("failed to broadcast brick information\n");
-    MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
-  }
-
-  /* Allocate memory for maskbit filenames. */
-  if (rank != BRICKMASK_MPI_ROOT) {
-    for (int i = 0; i < b->nsp; i++) {
-      if (b->nmask[i] &&
-          !(b->fmask[i] = malloc(b->nmask[i] * sizeof(char *)))) {
-        P_ERR("failed to allocate memory for task-private brick information\n");
-        MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
-      }
-      for (size_t j = 0; j < b->nmask[i]; j++) b->fmask[i][j] = NULL;
-      if (b->nmask[i] &&
-          !(b->fmask[i][0] = malloc(b->mlen[i] * sizeof(char)))) {
-        P_ERR("failed to allocate memory for task-private brick information\n");
-        MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
-      }
-    }
-  }
-
-  /* Broadcast maskfit filenames. */
-  MPI_Request *nreq = malloc(b->nsp * sizeof *nreq);
-  if (!nreq) {
-    P_ERR("failed to allocate memory for broadcasting brick information\n");
-    MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
-  }
-  for (int i = 0; i < b->nsp; i++) {
-    if (MPI_Ibcast(b->fmask[i][0], b->mlen[i], MPI_CHAR, BRICKMASK_MPI_ROOT,
-        MPI_COMM_WORLD, nreq + i)) {
-      P_ERR("failed to broadcast brick information\n");
-      MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
-    }
-  }
-
-  if (MPI_Waitall(b->nsp, nreq, MPI_STATUSES_IGNORE)) {
-    P_ERR("failed to broadcast brick information\n");
-    MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
-  }
-  free(nreq);
-
-  if (rank != BRICKMASK_MPI_ROOT) {
-    for (int i = 0; i < b->nsp; i++) {
-      /* Search for individual filenames. */
-      char *end = b->fmask[i][0] + b->mlen[i];
-      for (size_t j = 1; j < b->nmask[i]; j++) {
-        char *p = b->fmask[i][j - 1];
-        b->fmask[i][j] = memchr(p, '\0', end - p) + 1;
-      }
-    }
   }
 }
 
@@ -183,16 +138,9 @@ static void mpi_scatter_data(DATA **data) {
       MPI_Comm_rank(MPI_COMM_WORLD, &rank))
     MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
 
-  bool subid = false;
-  if (rank == BRICKMASK_MPI_ROOT && (*data)->subid) subid = true;
-  if (MPI_Bcast(&subid, 1, MPI_C_BOOL, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD)) {
-    P_ERR("failed to share data information\n");
-    MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
-  }
-
-  int *nsend, *disp;
-  if (!(nsend = calloc(size, sizeof(int))) ||
-      !(disp = calloc(size, sizeof(int)))) {
+  int *nsend, *disp;    /* Scatterv only accepts ints. */
+  if (!(nsend = malloc(size * sizeof(int))) ||
+      !(disp = malloc((size + 1) * sizeof(int)))) {
     P_ERR("failed to allocate memory for sharing data information\n");
     MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
   }
@@ -201,44 +149,30 @@ static void mpi_scatter_data(DATA **data) {
   /* Split the data by brick IDs. */
   if (rank == BRICKMASK_MPI_ROOT) {
     d = *data;
-    long num = d->nbrick / size;        /* number of bricks per worker */
-    long num0 = d->nbrick - num * (size - 1);   /* number of bricks for root */
-
-    /* Count the number of data associated with each brick. */
-    long prev = -1;
-    long cnt = -1;
-    size_t i_prev = 0;
-    for (size_t i = 0; i < d->n; i++) {
-      if (d->id[i] != prev) {
-        prev = d->id[i];
-        if (++cnt == num0) {
-          i_prev = i;
-          break;
-        }
-      }
-    }
-    if (!i_prev) i_prev = d->n;
+    const size_t pnum = d->nbrick / size;   /* number of bricks per worker */
+    const int rem = d->nbrick % size;
+    /* Go to the next worker if the desired number of bricks are assigned. */
+    size_t goal = (0 < rem) ? pnum + 1 : pnum;
     int wid = 0;
-    nsend[wid++] = i_prev;      /* number of data to be processed by root */
-    for (size_t i = i_prev; i < d->n; i++) {
+    size_t cnt = 0;
+    disp[0] = 0;
+    long prev = d->id[0];
+
+    for (size_t i = 1; i < d->n; i++) {
       if (d->id[i] != prev) {
         prev = d->id[i];
-        if (++cnt == num0 + num * wid) {
-          /* Compute the length of data for this worker. */
-          nsend[wid] = i - i_prev;
-          disp[wid] = disp[wid - 1] + nsend[wid - 1];
+        if (++cnt == goal) {
           if (wid++ == size) {
             P_ERR("unexpected number of MPI tasks\n");
             MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_UNKNOWN);
           }
-          i_prev = i;
+          disp[wid] = i;
+          goal = (wid < rem) ? (pnum + 1) * (wid + 1) : pnum * (wid + 1) + rem;
         }
       }
     }
-    if (wid != size) {
-      nsend[wid] = d->n - i_prev;
-      disp[wid] = disp[wid - 1] + nsend[wid - 1];
-    }
+    for (int i = wid + 1; i <= size; i++) disp[i] = d->n;
+    for (int i = 0; i < size; i++) nsend[i] = disp[i + 1] - disp[i];
   }
   /* Allocate memory for the task-private data. */
   else {
@@ -248,29 +182,37 @@ static void mpi_scatter_data(DATA **data) {
     }
     d = *data;
     d->ra = d->dec = NULL;
-    d->idx = NULL;
+    d->idx = d->cidx = d->iidx = NULL;
     d->id = NULL;
-    d->mask = NULL;
-    d->subid = NULL;
+    d->mask = d->nexp[0] = d->nexp[1] = d->nexp[2] = NULL;
     d->content = NULL;
   }
 
   /* Broadcast the length of data and number of bricks for each task. */
-  MPI_Request req[3];
-  if (MPI_Ibcast(nsend, size, MPI_INT, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD,
-      req) || MPI_Ibcast(disp, size, MPI_INT, BRICKMASK_MPI_ROOT,
-      MPI_COMM_WORLD, req + 1) || MPI_Ibcast(&d->nbrick, 1, MY_MPI_SIZE_T,
-      BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 2) ||
-      MPI_Waitall(3, req, MPI_STATUSES_IGNORE)) {
+  MPI_Datatype dtypes[3], send_type;
+  int lengths[3];
+  MPI_Aint addrs[3];
+
+  dtypes[0] = dtypes[1] = MPI_INT;
+  dtypes[2] = MY_MPI_SIZE_T;
+  lengths[0] = lengths[1] = size;
+  lengths[2] = 1;
+  if (MPI_Get_address(nsend, addrs) ||
+      MPI_Get_address(disp, addrs + 1) ||
+      MPI_Get_address(&(d->nbrick), addrs + 2) ||
+      MPI_Type_create_struct(3, lengths, addrs, dtypes, &send_type) ||
+      MPI_Type_commit(&send_type) ||
+      MPI_Bcast(MPI_BOTTOM, 1, send_type, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+      MPI_Type_free(&send_type)) {
     P_ERR("failed to share data information\n");
     MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
   }
 
   /* Set length of data and number of bricks for each task. */
   d->n = nsend[rank];
-  size_t nbrick = d->nbrick / size;
-  if (rank == BRICKMASK_MPI_ROOT) d->nbrick -= nbrick * (size - 1);
-  else d->nbrick = nbrick;
+  const size_t pnum = d->nbrick / size;
+  const int rem = d->nbrick % size;
+  d->nbrick = (rank < rem) ? pnum + 1 : pnum;
 
   /* Allocate memory for the data. */
   if (rank != BRICKMASK_MPI_ROOT && d->n) {
@@ -278,13 +220,16 @@ static void mpi_scatter_data(DATA **data) {
         !(d->dec = malloc(d->n * sizeof(double))) ||
         !(d->id = malloc(d->n * sizeof(long))) ||
         !(d->mask = calloc(d->n, sizeof(uint64_t))) ||
-        (subid && !(d->subid = calloc(d->n, sizeof(unsigned char))))) {
+        !(d->nexp[0] = calloc(d->n, sizeof(uint64_t))) ||
+        !(d->nexp[1] = calloc(d->n, sizeof(uint64_t))) ||
+        !(d->nexp[2] = calloc(d->n, sizeof(uint64_t)))) {
       P_ERR("failed to allocate memory for the task-private data\n");
       MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MEMORY);
     }
   }
 
   /* Scatter the data. */
+  MPI_Request req[3];
   if (rank == BRICKMASK_MPI_ROOT) {     /* in-place scatter from the root */
     if (MPI_Iscatterv(d->ra, nsend, disp, MPI_DOUBLE, MPI_IN_PLACE, d->n,
         MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req) ||
@@ -396,7 +341,6 @@ void mpi_gather_data(BRICK *brick, DATA *data) {
   }
 
   /* Gather the number of objects assigned to each task. */
-  MPI_Request req[4];
   int n = data->n;
   int *nrecv, *disp;
   nrecv = disp = NULL;
@@ -460,21 +404,18 @@ void mpi_gather_data(BRICK *brick, DATA *data) {
     for (int i = 1; i < size; i++) disp[i] = disp[i - 1] + nrecv[i - 1];
 
     /* Gather data. */
-    if (MPI_Igatherv(MPI_IN_PLACE, n, MPI_DOUBLE, data->ra, nrecv, disp,
-        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req) ||
-        MPI_Igatherv(MPI_IN_PLACE, n, MPI_DOUBLE, data->dec, nrecv, disp,
-        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 1) ||
-        MPI_Igatherv(MPI_IN_PLACE, n, MPI_UINT64_T, data->mask, nrecv, disp,
-        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 2) ||
-        (data->subid && MPI_Igatherv(MPI_IN_PLACE, n, MPI_UNSIGNED_CHAR,
-        data->subid, nrecv, disp, MPI_UNSIGNED_CHAR, BRICKMASK_MPI_ROOT,
-        MPI_COMM_WORLD, req + 3))) {
-      P_ERR("failed to gather data information\n");
-      MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
-    }
-
-    int nreq = (data->subid) ? 4 : 3;
-    if (MPI_Waitall(nreq, req, MPI_STATUSES_IGNORE)) {
+    if (MPI_Gatherv(MPI_IN_PLACE, n, MPI_DOUBLE, data->ra, nrecv, disp,
+        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(MPI_IN_PLACE, n, MPI_DOUBLE, data->dec, nrecv, disp,
+        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(MPI_IN_PLACE, n, MPI_UINT64_T, data->mask, nrecv, disp,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(MPI_IN_PLACE, n, MPI_UINT64_T, data->nexp[0], nrecv, disp,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(MPI_IN_PLACE, n, MPI_UINT64_T, data->nexp[1], nrecv, disp,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(MPI_IN_PLACE, n, MPI_UINT64_T, data->nexp[2], nrecv, disp,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD)) {
       P_ERR("failed to gather data information\n");
       MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
     }
@@ -485,8 +426,14 @@ void mpi_gather_data(BRICK *brick, DATA *data) {
     free(nrecv);
     free(disp);
 
-    /* Get the largest mask width. */
+    /* Get the largest mask widths. */
     if (MPI_Reduce(MPI_IN_PLACE, &data->mtype, 1, MPI_INT, MPI_MAX,
+        BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Reduce(MPI_IN_PLACE, data->etype, 1, MPI_INT, MPI_MAX,
+        BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Reduce(MPI_IN_PLACE, data->etype + 1, 1, MPI_INT, MPI_MAX,
+        BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Reduce(MPI_IN_PLACE, data->etype + 2, 1, MPI_INT, MPI_MAX,
         BRICKMASK_MPI_ROOT, MPI_COMM_WORLD)) {
       P_ERR("failed to gather data information\n");
       MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
@@ -494,28 +441,31 @@ void mpi_gather_data(BRICK *brick, DATA *data) {
   }
   else {
     /* Gather data. */
-    if (MPI_Igatherv(data->ra, n, MPI_DOUBLE, NULL, NULL, NULL,
-        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req) ||
-        MPI_Igatherv(data->dec, n, MPI_DOUBLE, NULL, NULL, NULL,
-        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 1) ||
-        MPI_Igatherv(data->mask, n, MPI_UINT64_T, NULL, NULL, NULL,
-        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD, req + 2) ||
-        (data->subid && MPI_Igatherv(data->subid, n, MPI_UNSIGNED_CHAR,
-        NULL, NULL, NULL, MPI_UNSIGNED_CHAR, BRICKMASK_MPI_ROOT,
-        MPI_COMM_WORLD, req + 3))) {
-      P_ERR("failed to gather data information\n");
-      MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
-    }
-
-    int nreq = (data->subid) ? 4 : 3;
-    if (MPI_Waitall(nreq, req, MPI_STATUSES_IGNORE)) {
+    if (MPI_Gatherv(data->ra, n, MPI_DOUBLE, NULL, NULL, NULL,
+        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(data->dec, n, MPI_DOUBLE, NULL, NULL, NULL,
+        MPI_DOUBLE, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(data->mask, n, MPI_UINT64_T, NULL, NULL, NULL,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(data->nexp[0], n, MPI_UINT64_T, NULL, NULL, NULL,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(data->nexp[1], n, MPI_UINT64_T, NULL, NULL, NULL,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Gatherv(data->nexp[2], n, MPI_UINT64_T, NULL, NULL, NULL,
+        MPI_UINT64_T, BRICKMASK_MPI_ROOT, MPI_COMM_WORLD)) {
       P_ERR("failed to gather data information\n");
       MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
     }
 
     /* Send the largest mask width. */
-    if (MPI_Reduce(&data->mtype, NULL, 1, MPI_INT, MPI_MAX, BRICKMASK_MPI_ROOT,
-        MPI_COMM_WORLD)) {
+    if (MPI_Reduce(&data->mtype, NULL, 1, MPI_INT, MPI_MAX,
+        BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Reduce(data->etype, NULL, 1, MPI_INT, MPI_MAX,
+        BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Reduce(data->etype + 1, NULL, 1, MPI_INT, MPI_MAX,
+        BRICKMASK_MPI_ROOT, MPI_COMM_WORLD) ||
+        MPI_Reduce(data->etype + 2, NULL, 1, MPI_INT, MPI_MAX,
+        BRICKMASK_MPI_ROOT, MPI_COMM_WORLD)) {
       P_ERR("failed to gather data information\n");
       MPI_Abort(MPI_COMM_WORLD, BRICKMASK_ERR_MPI);
     }

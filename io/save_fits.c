@@ -87,12 +87,6 @@ Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
 
-#ifdef BRICKMASK_WFITS_MTYPE
-  #undef BRICKMASK_FITS_MTYPE
-#endif
-#ifdef BRICKMASK_WFITS_SUBID
-  #undef BRICKMASK_FITS_SUBID
-#endif
 #ifdef BRICKMASK_WFITS_OVERWRITE
   #undef BRICKMASK_WFITS_OVERWRITE
 #endif
@@ -100,197 +94,18 @@ Return:
   #undef BRICKMASK_FITS_ALLCOL
 #endif
 
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           0
 #define BRICKMASK_WFITS_OVERWRITE       0
 #define BRICKMASK_WFITS_ALLCOL          0
 #include "fits_write.c"
 
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           0
 #define BRICKMASK_WFITS_OVERWRITE       0
 #define BRICKMASK_WFITS_ALLCOL          1
 #include "fits_write.c"
 
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           0
 #define BRICKMASK_WFITS_OVERWRITE       1
 #define BRICKMASK_WFITS_ALLCOL          0
 #include "fits_write.c"
 
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TBYTE
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TSHORT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TINT
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           0
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       0
-#define BRICKMASK_WFITS_ALLCOL          1
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           1
-#define BRICKMASK_WFITS_OVERWRITE       1
-#define BRICKMASK_WFITS_ALLCOL          0
-#include "fits_write.c"
-
-#define BRICKMASK_WFITS_MTYPE           TLONG
-#define BRICKMASK_WFITS_SUBID           1
 #define BRICKMASK_WFITS_OVERWRITE       1
 #define BRICKMASK_WFITS_ALLCOL          1
 #include "fits_write.c"
@@ -327,99 +142,12 @@ int save_fits(const CONF *conf, const DATA *data, const int idx) {
   /* Choose the function for saving the FITS catalogue. */
   int (*save_fits_func) (const char *, const CONF *, const DATA *, const int) =
       NULL;
-  switch (data->mtype) {
-    case TBYTE:
-      if (strcmp(conf->input[idx], conf->output[idx])) {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint8_t_subid :
-              fits_save_uint8_t_subid_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint8_t :
-              fits_save_uint8_t_all;
-        }
-      }
-      else {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint8_t_subid_overwrite :
-              fits_save_uint8_t_subid_overwrite_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint8_t_overwrite :
-              fits_save_uint8_t_overwrite_all;
-        }
-      }
-      break;
-    case TSHORT:
-      if (strcmp(conf->input[idx], conf->output[idx])) {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint16_t_subid :
-              fits_save_uint16_t_subid_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint16_t :
-              fits_save_uint16_t_all;
-        }
-      }
-      else {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint16_t_subid_overwrite :
-              fits_save_uint16_t_subid_overwrite_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint16_t_overwrite :
-              fits_save_uint16_t_overwrite_all;
-        }
-      }
-      break;
-    case TINT:
-      if (strcmp(conf->input[idx], conf->output[idx])) {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint32_t_subid :
-              fits_save_uint32_t_subid_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint32_t :
-              fits_save_uint32_t_all;
-        }
-      }
-      else {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint32_t_subid_overwrite :
-              fits_save_uint32_t_subid_overwrite_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint32_t_overwrite :
-              fits_save_uint32_t_overwrite_all;
-        }
-      }
-      break;
-    case TLONG:
-      if (strcmp(conf->input[idx], conf->output[idx])) {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint64_t_subid :
-              fits_save_uint64_t_subid_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint64_t :
-              fits_save_uint64_t_all;
-        }
-      }
-      else {
-        if (data->subid) {
-          save_fits_func = (conf->ncol) ? fits_save_uint64_t_subid_overwrite :
-              fits_save_uint64_t_subid_overwrite_all;
-        }
-        else {
-          save_fits_func = (conf->ncol) ? fits_save_uint64_t_overwrite :
-              fits_save_uint64_t_overwrite_all;
-        }
-      }
-      break;
-    default:
-      P_ERR("unexpected data type for maskbits: %d\n", data->mtype);
-      free(output);
-      return BRICKMASK_ERR_UNKNOWN;
+  if (strcmp(conf->input[idx], conf->output[idx])) {
+    save_fits_func = (conf->ncol) ? fits_save : fits_save_all;
+  }
+  else {
+    save_fits_func = (conf->ncol) ?
+        fits_save_overwrite : fits_save_overwrite_all;
   }
 
   /* Save the FITS catalogue. */

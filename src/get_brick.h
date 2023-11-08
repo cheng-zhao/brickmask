@@ -48,14 +48,12 @@ typedef struct {
   double *dec1;         /* minimum declination of the bricks            */
   double *dec2;         /* maximum declination of the bricks            */
   char **name;          /* name of the bricks                           */
-  int nsp;              /* number of subsamples                         */
-  int *subid;           /* IDs of subsamples                            */
-  size_t *nmask;        /* number of maskbit files for each subsample   */
-  char ***fmask;        /* names of maskbit files                       */
+  unsigned char *photsys;       /* photometric region (N or S)          */
+  char *bpath;          /* path of the bricks                           */
   uint64_t mnull;       /* bit code for objects outside maskbit bricks  */
+  uint64_t enull;       /* bit code for objects outside nexp bricks     */
 #ifdef MPI
   int nlen;             /* length of the brick names                    */
-  size_t *mlen;         /* total length of filenames for each subsample */
 #endif
 } BRICK;
 

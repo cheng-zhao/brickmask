@@ -189,6 +189,7 @@ int read_brick(const char *fname, BRICK *brick) {
       !(brick->ra2 = malloc(n * sizeof(double))) ||
       !(brick->dec1 = malloc(n * sizeof(double))) ||
       !(brick->dec2 = malloc(n * sizeof(double))) ||
+      !(brick->photsys = malloc(n * sizeof(unsigned char))) ||
       !(brick->name = malloc(n * sizeof(char *)))) {
     P_ERR("failed to allocate memory for the information of bricks\n");
     return BRICKMASK_ERR_MEMORY;
@@ -209,8 +210,8 @@ int read_brick(const char *fname, BRICK *brick) {
   for (size_t i = 1; i < brick->n; i++)
     brick->name[i] = brick->name[0] + i * (nlen + 1);
 
-  /* Get columns of coordinate ranges. */
-  int ccol[4];
+  /* Get columns of coordinate ranges and photsys. */
+  int ccol[5];
   if (fits_get_colnum(fp, BRICKMASK_FITS_CASESEN, BRICKMASK_FITS_RAMIN,
       ccol, &status)) FITS_ABORT;
   if (fits_get_colnum(fp, BRICKMASK_FITS_CASESEN, BRICKMASK_FITS_RAMAX,
@@ -219,6 +220,8 @@ int read_brick(const char *fname, BRICK *brick) {
       ccol + 2, &status)) FITS_ABORT;
   if (fits_get_colnum(fp, BRICKMASK_FITS_CASESEN, BRICKMASK_FITS_DECMAX,
       ccol + 3, &status)) FITS_ABORT;
+  if (fits_get_colnum(fp, BRICKMASK_FITS_CASESEN, BRICKMASK_FITS_PHOTSYS,
+      ccol + 4, &status)) FITS_ABORT;
 
   /* Get the optimal number of rows to read at one time. */
   long nstep = 0;
@@ -242,6 +245,9 @@ int read_brick(const char *fname, BRICK *brick) {
         brick->dec1 + nread - 1, &anynul, &status)) FITS_ABORT;
     if (fits_read_col_dbl(fp, ccol[3], nread, 1, nrow, 0,
         brick->dec2 + nread - 1, &anynul, &status)) FITS_ABORT;
+    /* Read photsys. */
+    if (fits_read_col_byt(fp, ccol[4], nread, 1, nrow, '\0',
+        brick->photsys + nread - 1, &anynul, &status)) FITS_ABORT;
     nread += nrow;
     nrest -= nrow;
   }
@@ -292,18 +298,6 @@ int read_fits(const char *fname, const CONF *conf, DATA *data) {
   }
   status = 0;
   fits_clear_errmsg();
-  if (conf->subid) {
-    if (fits_get_colnum(fp, BRICKMASK_FITS_CASESEN, BRICKMASK_FITS_SUBID,
-        &col, &status) != COL_NOT_FOUND) {
-      P_ERR("the subsample ID column (%s) exists in the input catalog.",
-          BRICKMASK_FITS_SUBID);
-      status = 0;
-      fits_close_file(fp, &status);
-      return BRICKMASK_ERR_FILE;
-    }
-    status = 0;
-    fits_clear_errmsg();
-  }
 
   /* Get the number of objects. */
   long ndata = 0;
@@ -395,11 +389,12 @@ Function `read_mask`:
   Read a maskbit file.
 Arguments:
   * `fname`:    name of a masbit file;
-  * `mask`:     structure for maskbits.
+  * `mask`:     structure for maskbits;
+  * `dtype`:    data type of bit codes.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int read_mask(const char *fname, MASK *mask) {
+int read_mask(const char *fname, MASK *mask, int *dtype) {
   if (!fname) {
     P_ERR("the maskbit filename is not available\n");
     return BRICKMASK_ERR_INIT;
@@ -468,10 +463,10 @@ int read_mask(const char *fname, MASK *mask) {
   }
 
   switch (bitpix) {
-    case BYTE_IMG:     mask->dtype = TBYTE;  break;
-    case SHORT_IMG:    mask->dtype = TSHORT; break;
-    case LONG_IMG:     mask->dtype = TINT;   break;
-    case LONGLONG_IMG: mask->dtype = TLONG;  break;
+    case BYTE_IMG:     *dtype = TBYTE;  break;
+    case SHORT_IMG:    *dtype = TSHORT; break;
+    case LONG_IMG:     *dtype = TINT;   break;
+    case LONGLONG_IMG: *dtype = TLONG;  break;
     default:
       P_ERR("invalid data type (%d) of the maskbit image: `%s'\n",
           bitpix, fname);
@@ -489,7 +484,7 @@ int read_mask(const char *fname, MASK *mask) {
 #else
   /* Flexible image access (for compressed images). */
   if (fits_set_bscale(fp, 1, 0, &status)) FITS_ABORT;
-  if (fits_read_img(fp, mask->dtype, 1, mask->size, 0, mask->bit, 0, &status))
+  if (fits_read_img(fp, *dtype, 1, mask->size, 0, mask->bit, 0, &status))
     FITS_ABORT;
 #endif
 

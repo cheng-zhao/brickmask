@@ -48,11 +48,8 @@
 #define DEFAULT_OVERWRITE               0
 #define DEFAULT_VERBOSE                 true
 
-#ifdef EBOSS
-#define DEFAULT_MASK_NULL               0
-#else
 #define DEFAULT_MASK_NULL               1
-#endif
+#define DEFAULT_NEXP_NULL               0
 
 #define BRICKMASK_MAX_SUBID             UCHAR_MAX
 #define BRICKMASK_MAX_NUM_CAT           65536
@@ -69,28 +66,30 @@
 #define BRICKMASK_FILE_CHUNK    1048576 /* chunk size for ASCII file IO */
 #define BRICKMASK_MAX_CHUNK     INT_MAX /* maximum allowed chunk size   */
 #define BRICKMASK_READ_COMMENT  '#'     /* comment symbol for reading   */
-/* Initial number of objects allocated for the input catalogue.           */
+/* Initial number of objects allocated for the input catalogue.         */
 #define BRICKMASK_DATA_INIT_NUM                 128
-/* Initial size for columns other than coordinates to be read from file   */
+/* Initial size for columns other than coordinates to be read from file.  */
 #define BRICKMASK_CONTENT_INIT_SIZE             1024
-/* Maximum content doubling size                                          */
+/* Maximum content doubling size.                                         */
 #define BRICKMASK_CONTENT_MAX_DOUBLE_SIZE       INT_MAX
-/* Maximum content size                                                   */
+/* Maximum content size.                                                  */
 #define BRICKMASK_CONTENT_MAX_SIZE              SIZE_MAX
+/* Maximum number of characters in filenames.                             */
+#define BRICKMASK_MAX_FILENAME                  2048
 
 /*============================================================================*\
                             Other runtime constants
 \*============================================================================*/
 #define BRICKMASK_CODE_NAME     "BRICKMASK"     /* name of the program */
 #define BRICKMASK_SPACE_ESCAPE  '\\'    /* escape character for spaces */
-#define BRICKMASK_TOL   1e-9    /* tolerance for coordinate comparison */
+#define BRICKMASK_TOL   0x1p-25    /* tolerance for coordinate comparison */
 /* Names of FITS columns. */
 #define BRICKMASK_FITS_BRICKNAME        "BRICKNAME"
 #define BRICKMASK_FITS_RAMIN            "RA1"
 #define BRICKMASK_FITS_RAMAX            "RA2"
 #define BRICKMASK_FITS_DECMIN           "DEC1"
 #define BRICKMASK_FITS_DECMAX           "DEC2"
-#define BRICKMASK_FITS_SUBID            "SUBID"
+#define BRICKMASK_FITS_PHOTSYS          "PHOTSYS"
 /* Maximum length of FITS columns. */
 #define BRICKMASK_FITS_MAX_COLNAME      32
 /* Case sensitivity of FITS columns. */
@@ -98,15 +97,10 @@
 /* Number of revisions for showing progress. */
 #define BRICKMASK_PROGRESS_NUM          20
 
-#ifdef EBOSS
-#define EBOSS_MASK_VALID(bit)           ((bit) & 1)
-#define EBOSS_XYBUG_BIT                 4
-#define EBOSS_XYBUG_VALID(bit)          ((bit) & (EBOSS_XYBUG_BIT))
-#endif
-
 #ifdef MPI
 #define BRICKMASK_MPI_ROOT              0       /* root rank of MPI */
 #define BRICKMASK_MAX_DATA              INT_MAX /* maximum number of data */
+#define BRICKMASK_MAX_BRICK             INT_MAX /* maximum number of bricks */
 #endif
 
 /*============================================================================*\

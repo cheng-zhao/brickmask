@@ -50,6 +50,7 @@ typedef enum {
 typedef struct {
   BRICKMASK_ffmt_t fmt; /* format of the input data catalogue           */
   int mtype;            /* data type of maskbits                        */
+  int etype[3];         /* data type of nexp bits                       */
   size_t n;             /* number of objects read from file             */
   size_t nmax;          /* number of objects allocated for the data     */
   size_t csize;         /* size of the content read from file           */
@@ -62,7 +63,7 @@ typedef struct {
   size_t *iidx;         /* index range for different input catalogues   */
   long *id;             /* brick ID, signed type for sorting comparison */
   uint64_t *mask;       /* maskbit value                                */
-  unsigned char *subid; /* ID of the subsample                          */
+  uint64_t *nexp[3];    /* nexp values                                  */
   void *content;        /* ASCII: address for the rest of the columns
                            FITS:  properties of output columns          */
 } DATA;

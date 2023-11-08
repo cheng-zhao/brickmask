@@ -41,10 +41,9 @@
 typedef struct {
   char *fconf;          /* Name of the configuration file. */
   char *flist;          /* BRICK_LIST           */
-  char **fmask;         /* MASKBIT_FILES        */
+  char *bpath;          /* BRICK_PATH           */
   int mnull;            /* MASKBIT_NULL         */
-  int nsub;             /* Number of subsamples. */
-  int *subid;           /* SUBSAMPLE_ID         */
+  int enull;            /* NEXP_NULL            */
   char *ilist;          /* INPUT_FILES          */
   char **input;         /* Input catalogs.      */
   int ncat;             /* Number of input/output catalogues. */
@@ -58,6 +57,7 @@ typedef struct {
   int ncol;             /* Number of output columns. */
   int *onum;            /* Column numbers to be saved to the output. */
   char *mcol;           /* MASKBIT_COLUMN       */
+  char **ecol;          /* NEXP_COLUMNS         */
   int ovwrite;          /* OVERWRITE            */
   bool verbose;         /* VERBOSE              */
 } CONF;

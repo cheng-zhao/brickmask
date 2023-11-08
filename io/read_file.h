@@ -93,10 +93,11 @@ Function `read_mask`:
   Read a maskbit file.
 Arguments:
   * `fname`:    name of a masbit file;
-  * `mask`:     structure for maskbits.
+  * `mask`:     structure for maskbits;
+  * `dtype`:    data type of bit codes.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-int read_mask(const char *fname, MASK *mask);
+int read_mask(const char *fname, MASK *mask, int *dtype);
 
 #endif

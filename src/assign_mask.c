@@ -48,11 +48,12 @@ static void mask_destroy(MASK *mask) {
 Function `mask_init`:
   Initialise the structure for maskbits.
 Arguments:
-  * `mnull`:    bit code for objects outside bricks.
+  * `mnull`:    bit code for objects outside bricks;
+  * `enull`:    bit code for objects without nexp.
 Return:
   Address of the structure for maskbits on success; NULL on error.
 ******************************************************************************/
-static inline MASK *mask_init(uint32_t mnull) {
+static inline MASK *mask_init(const uint64_t mnull, const uint64_t enull) {
   MASK *mask = calloc(1, sizeof(MASK));
   if (!mask) {
     P_ERR("failed to allocate memory for maskbits\n");
@@ -68,34 +69,9 @@ static inline MASK *mask_init(uint32_t mnull) {
   mask->wcs = wcs;
   mask->bit = NULL;
   mask->mnull = mnull;
+  mask->enull = enull;
 
   return mask;
-}
-
-/******************************************************************************
-Function `get_maskbit_fname`:
-  Find maskbit files containing a given brick name.
-Arguments:
-  * `brick`:    structure for bricks;
-  * `bname`:    name of the brick to be found;
-  * `fname`:    pointers to maskbit filenames that are found;
-  * `nsp`:      number of subsamples containing the brick name.
-******************************************************************************/
-static void get_maskbit_fname(const BRICK *brick, const char *bname,
-    char **fname, unsigned char *subid, int *nsp) {
-  int n = 0;
-  for (int i = 0; i < brick->nsp; i++) {
-    for (size_t j = 0; j < brick->nmask[i]; j++) {
-      char *fcheck = brick->fmask[i][j];
-      if (!(*fcheck)) continue;         /* the file has been visited */
-      if (strstr(fcheck, bname)) {      /* the file is found */
-        if (brick->subid) subid[n] = brick->subid[i];
-        fname[n++] = fcheck;
-        break;                          /* stop searching this subsample */
-      }
-    }
-  }
-  *nsp = n;
 }
 
 /******************************************************************************
@@ -186,6 +162,54 @@ Return:
 
 
 /*============================================================================*\
+                        Function for assigning maskbits
+\*============================================================================*/
+
+/******************************************************************************
+Function `assign_mask_from_file`:
+  Read maskbits from file and assign them to the data catalogue.
+Arguments:
+  * `fname`:    filename of the maskbits file;
+  * `mask`:     structure for maskbits;
+  * `ra`:       right ascension of the data catalogue;
+  * `dec`:      declination of the data catalogue;
+  * `code`:     array for maskbits;
+  * `vnull`:    bit code for objects outside the mask bricks;
+  * `dtype`:    data type of bit codes;
+  * `ndata`:    number of data points to be processed.
+Return:
+  Zero on success; non-zero on error.
+******************************************************************************/
+static int assign_mask_from_file(const char *fname, MASK *mask,
+    const double *ra, const double *dec, uint64_t *code, const uint64_t vnull,
+    int *dtype, const size_t ndata) {
+  /* Check if the maskbit file exists. */
+  if (access(fname, R_OK)) {
+    for (size_t i = 0; i < ndata; i++) code[i] = vnull;
+    return 0;
+  }
+  /* Read maskbits. */
+  if (read_mask(fname, mask, dtype)) return BRICKMASK_ERR_MASK;
+
+  /* Choose the maskbit code assignment function given the data type. */
+  int (*assign_bitcode_func) (const MASK *, const double *, const double *,
+      uint64_t *, size_t) = NULL;
+  switch (*dtype) {
+    case TBYTE:  assign_bitcode_func = assign_bitcode_uint8_t;  break;
+    case TSHORT: assign_bitcode_func = assign_bitcode_uint16_t; break;
+    case TINT:   assign_bitcode_func = assign_bitcode_uint32_t; break;
+    case TLONG:  assign_bitcode_func = assign_bitcode_uint64_t; break;
+    default:
+      P_ERR("unexpected data type for maskbits: %d\n", *dtype);
+      return BRICKMASK_ERR_MASK;
+  }
+
+  if (assign_bitcode_func(mask, ra, dec, code, ndata))
+    return BRICKMASK_ERR_MASK;
+  return 0;
+}
+
+/*============================================================================*\
                         Interface for assigning maskbits
 \*============================================================================*/
 
@@ -250,29 +274,14 @@ int assign_mask(const BRICK *brick, DATA *data, const bool verbose) {
     return 0;
   }
 
-  /* Allocate memory for pointers to maskbit filenames, and subsample IDs. */
-  char **fname = malloc(brick->nsp * sizeof(char *));
-  if (!fname) {
-    P_ERR("failed to allocate memory for maskbit file pointers\n");
-    BRICKMASK_QUIT(BRICKMASK_ERR_MEMORY);
-  }
-  unsigned char *subid = calloc(brick->nsp, sizeof(unsigned char));
-  if (!subid) {
-    P_ERR("failed to allocate memory for subsample IDs\n");
-    free(fname);
-    BRICKMASK_QUIT(BRICKMASK_ERR_MEMORY);
-  }
-  int nsp = 0;
-
   /* Initialise maskbits. */
-  MASK *mask = mask_init(brick->mnull);
+  MASK *mask = mask_init(brick->mnull, brick->enull);
   if (!mask) {
-    free(fname); free(subid);
     BRICKMASK_QUIT(BRICKMASK_ERR_MEMORY);
   }
 
   /* Read and assign maskbits. */
-  bool has_null = false;
+  char fname[BRICKMASK_MAX_FILENAME];
   size_t imin, imax;
   imin = 0;
   while (imin < data->n) {
@@ -282,62 +291,53 @@ int assign_mask(const BRICK *brick, DATA *data, const bool verbose) {
     }
     size_t bid = data->id[imin];        /* ID of the corresponding brick. */
 
-    /* Erase maskbit filenames for the previous brick. */
-    for (int i = 0; i < nsp; i++) fname[i][0] = '\0';
-    /* Get maskbit filenames corresponding to this brick. */
-    get_maskbit_fname(brick, brick->name[bid], fname, subid, &nsp);
-    if (!nsp) {                 /* no maskbit file for this object */
-      has_null = true;
-      for (size_t i = imin; i < imax; i++) data->mask[i] = mask->mnull;
-      imin = imax;
-#ifdef MPI
-      if (verbose && rank == BRICKMASK_MPI_ROOT)
-#else
-      if (verbose)
-#endif
-      {
-        if (++cnt >= next) {
-          next += step;
-          printf("\x1B[%dD%*zu / %zu", wcol, ndg, cnt, data->nbrick);
-          fflush(stdout);
-        }
-      }
-      continue;
-    }
-
-    for (int i = 0; i < nsp; i++) {
-      /* Check if the maskbit file exists. */
-      if (access(fname[i], R_OK)) {
-        P_WRN("cannot access maskbit file: `%s'\n", fname[i]);
+    /* Determine filename of the maskbits brick. */
+    char photsys = brick->photsys[bid];
+    if (photsys != 'N' && photsys != 'S') {     /* no photometric data */
+      for (size_t i = imin; i < imax; i++) {
+        data->mask[i] = mask->mnull;
+        data->nexp[0][i] = data->nexp[1][i] = data->nexp[2][i] = mask->enull;
+        imin = imax;
         continue;
       }
+    }
+    const char *ns = (photsys == 'N') ? "north" : "south";
+    int nchar = snprintf(fname, BRICKMASK_MAX_FILENAME,
+        "%s/%s/coadd/%.3s/%s/legacysurvey-%s-maskbits.fits.fz",
+        brick->bpath, ns, brick->name[bid], brick->name[bid], brick->name[bid]);
+    if (nchar >= BRICKMASK_MAX_FILENAME) {
+      P_ERR("the brickmask filename is too long\n"
+          "Please enlarge `BRICKMASK_MAX_FILENAME` in `src/define.h`\n");
+      mask_destroy(mask);
+      BRICKMASK_QUIT(BRICKMASK_ERR_FILE);
+    }
 
-      /* Read maskbits for each subsample. */
-      if (read_mask(fname[i], mask)) {
-        free(fname); free(subid); mask_destroy(mask);
-        BRICKMASK_QUIT(BRICKMASK_ERR_MASK);
+    if (assign_mask_from_file(fname, mask, data->ra + imin, data->dec + imin,
+        data->mask + imin, mask->mnull, &(mask->dtype), imax - imin)) {
+      mask_destroy(mask);
+      BRICKMASK_QUIT(BRICKMASK_ERR_MASK);
+    }
+
+    /* Read NOBS_G. */
+    const char nobs[3] = {'g', 'r', 'z'};
+    for (int k = 0; k < 3; k++) {
+      nchar = snprintf(fname, BRICKMASK_MAX_FILENAME,
+          "%s/%s/coadd/%.3s/%s/legacysurvey-%s-nexp-%c.fits.fz",
+          brick->bpath, ns, brick->name[bid], brick->name[bid],
+          brick->name[bid], nobs[k]);
+      if (nchar >= BRICKMASK_MAX_FILENAME) {
+        P_ERR("the brickmask filename is too long\n"
+            "Please enlarge `BRICKMASK_MAX_FILENAME` in `src/define.h`\n");
+        mask_destroy(mask);
+        BRICKMASK_QUIT(BRICKMASK_ERR_FILE);
       }
-
-      /* Choose the maskbit code assigning function given the data type. */
-      int (*assign_bitcode_func) (const MASK *, DATA *, const size_t,
-          const size_t, const uint8_t) = NULL;
-      switch (mask->dtype) {
-        case TBYTE:  assign_bitcode_func = assign_bitcode_uint8_t;  break;
-        case TSHORT: assign_bitcode_func = assign_bitcode_uint16_t; break;
-        case TINT:   assign_bitcode_func = assign_bitcode_uint32_t; break;
-        case TLONG:  assign_bitcode_func = assign_bitcode_uint64_t; break;
-        default:
-          P_ERR("unexpected data type for maskbits: %d\n", mask->dtype);
-          free(fname); free(subid); mask_destroy(mask);
-          BRICKMASK_QUIT(BRICKMASK_ERR_MASK);
-      }
-
-      /* Assign maskbits. */
-      if (assign_bitcode_func(mask, data, imin, imax, subid[i])) {
-        free(fname); free(subid); mask_destroy(mask);
+      if (assign_mask_from_file(fname, mask, data->ra + imin, data->dec + imin,
+          data->nexp[k] + imin, mask->enull, mask->etype + k, imax - imin)) {
+        mask_destroy(mask);
         BRICKMASK_QUIT(BRICKMASK_ERR_MASK);
       }
     }
+
     imin = imax;
 
     /* Print the reading progress. */
@@ -362,11 +362,10 @@ int assign_mask(const BRICK *brick, DATA *data, const bool verbose) {
 #endif
     printf("\x1B[%dD%*zu / %zu\n", wcol, ndg, cnt, data->nbrick);
 
-  if (!has_null) data->mtype = mask->dtype;
-  else if (data->mtype < mask->dtype) data->mtype = mask->dtype;
+  if (data->mtype < mask->dtype) data->mtype = mask->dtype;
+  for (int k = 0; k < 3; k++)
+    if (data->etype[k] < mask->etype[k]) data->etype[k] = mask->etype[k];
 
-  free(fname);
-  free(subid);
   mask_destroy(mask);
 #ifdef MPI
   if (rank == BRICKMASK_MPI_ROOT)

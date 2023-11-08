@@ -12,16 +12,15 @@
 *******************************************************************************/
 
 /* Macros for the template functions. */
-#if defined(BRICKMASK_WFITS_MTYPE) && defined(BRICKMASK_WFITS_SUBID) && \
-  defined(BRICKMASK_WFITS_OVERWRITE) && defined(BRICKMASK_WFITS_ALLCOL)
+#if defined(BRICKMASK_WFITS_OVERWRITE) && defined(BRICKMASK_WFITS_ALLCOL)
 
 /* Macros for generating function names. */
 #ifndef CONCAT_FNAME
-  #define CONCAT_FNAME(a,b,c,d,e)       a##_##b##c##d##e
+  #define CONCAT_FNAME(a,b,c)           a##b##c
 #endif
 
 #ifndef FITS_WRITE_FUNC
-  #define FITS_WRITE_FUNC(a,b,c,d,e)    CONCAT_FNAME(a,b,c,d,e)
+  #define FITS_WRITE_FUNC(a,b,c)        CONCAT_FNAME(a,b,c)
 #endif
 
 
@@ -29,44 +28,11 @@
                              Definition validation
 \*============================================================================*/
 
-#ifdef BRICKMASK_MASKBIT_DTYPE
-  #undef BRICKMASK_MASKBIT_DTYPE
-#endif
-#ifdef BRICKMASK_MASKBIT_TFORM
-  #undef BRICKMASK_MASKBIT_TFORM
-#endif
-#ifdef FITS_WRITE_SUBID_NAME
-  #undef FITS_WRITE_SUBID_NAME
-#endif
 #ifdef FITS_WRITE_OVERWRITE_NAME
   #undef FITS_WRITE_OVERWRITE_NAME
 #endif
 #ifdef FITS_WRITE_ALLCOL_NAME
   #undef FITS_WRITE_ALLCOL_NAME
-#endif
-
-#if     BRICKMASK_WFITS_MTYPE == TBYTE
-  #define BRICKMASK_MASKBIT_DTYPE       uint8_t
-  #define BRICKMASK_MASKBIT_TFORM       "B"
-#elif   BRICKMASK_WFITS_MTYPE == TSHORT
-  #define BRICKMASK_MASKBIT_DTYPE       uint16_t
-  #define BRICKMASK_MASKBIT_TFORM       "I"
-#elif   BRICKMASK_WFITS_MTYPE == TINT
-  #define BRICKMASK_MASKBIT_DTYPE       uint32_t
-  #define BRICKMASK_MASKBIT_TFORM       "J"
-#elif   BRICKMASK_WFITS_MTYPE == TLONG
-  #define BRICKMASK_MASKBIT_DTYPE       uint64_t
-  #define BRICKMASK_MASKBIT_TFORM       "K"
-#else
-  #error "unexpected definition of `BRICKMASK_WFITS_MTYPE`"
-#endif
-
-#if     BRICKMASK_WFITS_SUBID == 1
-  #define FITS_WRITE_SUBID_NAME         _subid
-#elif   BRICKMASK_WFITS_SUBID == 0
-  #define FITS_WRITE_SUBID_NAME
-#else
-  #error "unexpected definition of `BRICKMASK_WFITS_SUBID`"
 #endif
 
 #if     BRICKMASK_WFITS_OVERWRITE == 1
@@ -129,8 +95,8 @@ Arguments:
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
-    FITS_WRITE_SUBID_NAME, FITS_WRITE_OVERWRITE_NAME, FITS_WRITE_ALLCOL_NAME)
+static int FITS_WRITE_FUNC(fits_save, FITS_WRITE_OVERWRITE_NAME,
+    FITS_WRITE_ALLCOL_NAME)
     (const char *fname, const CONF *conf, const DATA *data, const int icat) {
   int status = 0;
   fitsfile *fp = NULL;
@@ -140,6 +106,45 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
 #endif
   unsigned char *chunk = NULL;  /* array for reading FITS table */
   unsigned char *tab = NULL;    /* contents of the FITS table to be written */
+
+  /* Define the datatypes of the maskbits columns. */
+  int dtypes[4];
+  char *cols[4];
+  unsigned char *codes[4];
+  dtypes[0] = data->mtype;
+  cols[0] = conf->mcol;
+  codes[0] = (unsigned char *) data->mask;
+  for (int i = 0; i < 3; i++) {
+    dtypes[i + 1] = data->etype[i];
+    cols[i + 1] = conf->ecol[i];
+    codes[i + 1] = (unsigned char *) data->nexp[i];
+  }
+
+  size_t sizes[4];
+  char *tforms[4];
+  for (int i = 0; i < 4; i++) {
+    switch (dtypes[i]) {
+      case TBYTE:
+        sizes[i] = sizeof(uint8_t);
+        tforms[i] = "B";
+        break;
+      case TSHORT:
+        sizes[i] = sizeof(uint16_t);
+        tforms[i] = "I";
+        break;
+      case TINT:
+        sizes[i] = sizeof(uint32_t);
+        tforms[i] = "J";
+        break;
+      case TLONG:
+        sizes[i] = sizeof(uint64_t);
+        tforms[i] = "K";
+        break;
+      default:
+        P_ERR("unexpected data type for maskbits: %d\n", dtypes[i]);
+        return BRICKMASK_ERR_UNKNOWN;
+    }
+  }
 
   /* Open the input file to read columns. */
 #if BRICKMASK_WFITS_OVERWRITE == 1
@@ -172,10 +177,7 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
   FITS_COL_t *col = data->content;
   for (int i = 0; i < conf->ncol; i++) owidth += col[i].w;
 #endif
-  owidth += sizeof(BRICKMASK_MASKBIT_DTYPE);
-#if BRICKMASK_WFITS_SUBID == 1
-  owidth++;
-#endif
+  for (int i = 0; i < 4; i++) owidth += sizes[i];
 
 #if BRICKMASK_WFITS_OVERWRITE == 0
   /* Create the output file for receiving columns. */
@@ -196,13 +198,11 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
   nc = conf->ncol;
   #endif
 
-  /* Append maskbit and subsample ID columns. */
-  if (fits_insert_col(ofp, nc + 1, conf->mcol,
-      BRICKMASK_MASKBIT_TFORM, &status)) FITS_WRITE_ABORT;
-  #if BRICKMASK_WFITS_SUBID == 1
-  if (fits_insert_col(ofp, nc + 2, BRICKMASK_FITS_SUBID, "B", &status))
-    FITS_WRITE_ABORT;
-  #endif
+  /* Append maskbit columns. */
+  for (int i = 0; i < 4; i++) {
+    if (fits_insert_col(ofp, nc + i + 1, cols[i], tforms[i], &status))
+      FITS_WRITE_ABORT;
+  }
 #endif
 
   /* Set the number of rows to be read/written at once */
@@ -269,30 +269,29 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
 
       /* Append maskbit value with big endian. */
       const long didx = i + nread - 1;
-#if     BRICKMASK_WFITS_MTYPE == TBYTE || defined(WITH_BIG_ENDIAN)
-      memcpy(tab + idx, ((BRICKMASK_MASKBIT_DTYPE *) data->mask) +
-          data->iidx[icat] + didx, sizeof(BRICKMASK_MASKBIT_DTYPE));
-      idx += sizeof(BRICKMASK_MASKBIT_DTYPE);
+      for (int j = 0; j < 4; j++) {
+#ifdef WITH_BIG_ENDIAN
+        memcpy(tab + idx, codes[j] + (data->iidx[icat] + didx) * sizes[j],
+            sizes[j]);
+        idx += sizes[j];
 #else
-      unsigned char *msk = ((unsigned char *) data->mask) +
-        (data->iidx[icat] + didx) * sizeof(BRICKMASK_MASKBIT_DTYPE);
-  #if   BRICKMASK_WFITS_MTYPE == TLONG
-      tab[idx++] = msk[7];
-      tab[idx++] = msk[6];
-      tab[idx++] = msk[5];
-      tab[idx++] = msk[4];
-  #endif
-  #if   BRICKMASK_WFITS_MTYPE == TLONG || BRICKMASK_WFITS_MTYPE == TINT 
-      tab[idx++] = msk[3];
-      tab[idx++] = msk[2];
-  #endif
-      tab[idx++] = msk[1];
-      tab[idx++] = msk[0];
+        unsigned char *msk = codes[j] + (data->iidx[icat] + didx) * sizes[j];
+        if (dtypes[j] >= TLONG) {
+          tab[idx++] = msk[7];
+          tab[idx++] = msk[6];
+          tab[idx++] = msk[5];
+          tab[idx++] = msk[4];
+        }
+        if (dtypes[j] >= TINT) {
+          tab[idx++] = msk[3];
+          tab[idx++] = msk[2];
+        }
+        if (dtypes[j] >= TSHORT) {
+          tab[idx++] = msk[1];
+        }
+        tab[idx++] = msk[0];
 #endif
-      /* Append subsample ID. */
-#if BRICKMASK_WFITS_SUBID == 1
-      tab[idx++] = data->subid[data->iidx[icat] + didx];
-#endif
+      }
     }
 
 #if BRICKMASK_WFITS_OVERWRITE == 0
@@ -324,13 +323,11 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
   nc = conf->ncol;
   #endif
 
-  /* Append maskbit and subsample ID columns. */
-  if (fits_insert_col(fp, nc + 1, conf->mcol,
-      BRICKMASK_MASKBIT_TFORM, &status)) FITS_WRITE_ABORT;
-  #if BRICKMASK_WFITS_SUBID == 1
-  if (fits_insert_col(fp, nc + 2, BRICKMASK_FITS_SUBID, "B", &status))
-    FITS_WRITE_ABORT;
-  #endif
+  /* Append maskbit columns. */
+  for (int i = 0; i < 4; i++) {
+    if (fits_insert_col(fp, nc + i + 1, cols[i], tforms[i], &status))
+      FITS_WRITE_ABORT;
+  }
 
   /* Write the FITS table. */
   if (fits_write_tblbytes(fp, 1, 1, ntab, tab, &status)) FITS_WRITE_ABORT;
@@ -351,14 +348,9 @@ static int FITS_WRITE_FUNC(fits_save, BRICKMASK_MASKBIT_DTYPE,
 }
 
 
-#undef BRICKMASK_WFITS_MTYPE
-#undef BRICKMASK_WFITS_SUBID
 #undef BRICKMASK_WFITS_OVERWRITE
 #undef BRICKMASK_WFITS_ALLCOL
 
-#undef BRICKMASK_MASKBIT_DTYPE
-#undef BRICKMASK_MASKBIT_TFORM
-#undef FITS_WRITE_SUBID_NAME
 #undef FITS_WRITE_OVERWRITE_NAME
 #undef FITS_WRITE_ALLCOL_NAME
 

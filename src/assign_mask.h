@@ -53,8 +53,10 @@ typedef struct {
 typedef struct {
   long size;                    /* total number of maskbits             */
   int dtype;                    /* data type of maskbit values          */
+  int etype[3];                 /* data type of nexp bits               */
   long dim[2];                  /* dimensions of maskbits               */
   uint64_t mnull;               /* bit code for objects outside bricks  */
+  uint64_t enull;               /* bit code for objects without nexp    */
   unsigned char *bit;           /* maskbit values                       */
   WCS *wcs;                     /* WCS parameters                       */
 } MASK;

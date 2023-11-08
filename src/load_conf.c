@@ -86,7 +86,7 @@ Function `usage`:
 static void usage(void *args) {
   (void) args;
   printf("Usage: " BRICKMASK_CODE_NAME " [OPTION]\n\
-Assign maskbit codes to a catalog with sky coordinates.\n\
+Assign maskbit and nexp codes to a catalog with sky coordinates.\n\
   -h, --help\n\
         Display this message and exit\n\
   -t, --template\n\
@@ -95,12 +95,12 @@ Assign maskbit codes to a catalog with sky coordinates.\n\
         Specify the configuration file (default: `%s')\n\
   -l, --brick-list      " FMT_KEY(BRICK_LIST) "      String\n\
         Specify the FITS table listing all survey bricks\n\
-  -m, --mask-file       " FMT_KEY(MASKBIT_FILES) "   String array\n\
+  -p, --brick-path      " FMT_KEY(BRICK_PATH) "      String\n\
         Specify text files with paths of maskbit files\n\
   -n, --mask-null       " FMT_KEY(MASKBIT_NULL) "    Integer\n\
         Set the maskbit code for objects outside all maskbit bricks\n\
-  -s, --sample-id       " FMT_KEY(SUBSAMPLE_ID) "    Integer array\n\
-        Set IDs of subsamples\n\
+  -N, --nexp-null       " FMT_KEY(NEXP_NULL) "       Integer\n\
+        Set the bit code for objects without exposure counts\n\
   -i, --input           " FMT_KEY(INPUT_FILES) "     String\n\
         Specify the text file with paths of all input catalogs\n\
   -f, --file-type       " FMT_KEY(FILE_TYPE) "       Integer\n\
@@ -115,12 +115,14 @@ Assign maskbit codes to a catalog with sky coordinates.\n\
         Set columns to be written to the output catalog\n\
   -M, --mask-col        " FMT_KEY(MASKBIT_COLUMN) "  String\n\
         Set the name of the maskbit column for FITS-format output\n\
+  -E, --nexp-cols       " FMT_KEY(NEXP_COLUMNS) "    String array\n\
+        Set the names of the nexp columns for FITS-format output\n\
   -O, --overwrite       " FMT_KEY(OVERWRITE) "       Integer\n\
         Indicate whether to overwrite existing output files\n\
   -v, --verbose         " FMT_KEY(VERBOSE) "         Boolean\n\
         Indicate whether to display detailed standard outputs\n\
 Consult the -t option for more information on the parameters\n\
-Github repository: https://github.com/cheng-zhao/brickmask\n\
+Github repository: https://github.com/cheng-zhao/brickmask/tree/desi\n\
 Licence: MIT\n",
     DEFAULT_CONF_FILE);
   exit(0);
@@ -143,20 +145,16 @@ DEFAULT_CONF_FILE "').\n\
 # Unnecessary entries can be left unset.\n\
 \n\
 BRICK_LIST      = \n\
-    # Filename for the FITS table with the list of all bricks, see e.g.\n\
-    # https://www.legacysurvey.org/dr9/files/#survey-bricks-fits-gz\n\
-MASKBIT_FILES   = \n\
-    # String or string array, ASCII files with the paths of maskbit files.\n\
-    # Each element specifies maskbit files for a subsample, such as NGC or SGC.\n\
-    # Each row of the ASCII files specifies the path of a maskbit file.\n\
-    # Each space in the paths must be escaped by a leading '\\' character.\n\
-    # Name of the bricks must present in the filenames.\n\
-    # Lines starting with '%c' are omitted.\n\
+    # Filename for the FITS table with the list of all bricks\n\
+    # and their regions (N or S), see\n\
+    # www.legacysurvey.org/dr9/files/#survey-bricks-dr9-randoms-0-48-0-fits\n\
+BRICK_PATH      = \n\
+    # String, top level directory of maskbit and nexp files, see\n\
+    # https://www.legacysurvey.org/dr9/files/#for-web-access\n\
 MASKBIT_NULL    = \n\
-    # Integer, bit code for objects outisde all maskbit bricks (unset: %d).\n\
-SUBSAMPLE_ID    = \n\
-    # If set, the IDs of subsamples are saved to the output as an extra column.\n\
-    # Integer or integer array, same dimension as `MASKBIT_FILES`.\n\
+    # Integer, bit code for objects outside all maskbit bricks (unset: %d).\n\
+NEXP_NULL       = \n\
+    # Integer, bit code for objects without exposure counts (unset: %d).\n\
 INPUT_FILES     = \n\
     # Filename of an ASCII file storing paths of input catalogs.\n\
     # Formats and columns of all input files must be identical.\n\
@@ -187,6 +185,8 @@ OUTPUT_COLUMN   = \n\
     # as the last column (or last two columns).\n\
 MASKBIT_COLUMN  = \n\
     # String, name of the maskbit column in the FITS-format `OUTPUT`.\n\
+NEXP_COLUMNS    = \n\
+    # String array, names of the nexp columns in the FITS-format `OUTPUT`.\n\
 OVERWRITE       = \n\
     # Flag indicating whether to overwrite existing files, integer (unset: %d).\n\
     # Allowed values are:\n\
@@ -195,7 +195,7 @@ OVERWRITE       = \n\
     # * negative: notify at most this number of times for existing files.\n\
 VERBOSE         = \n\
     # Boolean option, indicate whether to show detailed outputs (unset: %c).\n",
-      BRICKMASK_READ_COMMENT, DEFAULT_MASK_NULL, BRICKMASK_READ_COMMENT,
+      DEFAULT_MASK_NULL, DEFAULT_NEXP_NULL, BRICKMASK_READ_COMMENT,
       DEFAULT_FILE_TYPE, BRICKMASK_FFMT_ASCII, BRICKMASK_FFMT_FITS,
       DEFAULT_ASCII_COMMENT ? DEFAULT_ASCII_COMMENT : '\'',
       DEFAULT_ASCII_COMMENT ? "')" : ")", BRICKMASK_READ_COMMENT,
@@ -217,9 +217,10 @@ Return:
 static CONF *conf_init(void) {
   CONF *conf = calloc(1, sizeof *conf);
   if (!conf) return NULL;
-  conf->fconf = conf->flist = conf->ilist = conf->olist = conf->mcol = NULL;
-  conf->fmask = conf->input = conf->cname = conf->output = conf->ocol = NULL;
-  conf->subid = conf->onum = NULL;
+  conf->fconf = conf->flist = conf->bpath = conf->ilist = conf->olist = NULL;
+  conf->input = conf->cname = conf->output = conf->ocol = conf->ecol = NULL;
+  conf->mcol = NULL;
+  conf->onum = NULL;
   return conf;
 }
 
@@ -251,9 +252,9 @@ static cfg_t *conf_read(CONF *conf, const int argc, char *const *argv) {
   const cfg_param_t params[] = {
     {'c', "conf"        , "CONFIG_FILE"    , CFG_DTYPE_STR , &conf->fconf   },
     {'l', "brick-list"  , "BRICK_LIST"     , CFG_DTYPE_STR , &conf->flist   },
-    {'m', "mask-file"   , "MASKBIT_FILES"  , CFG_ARRAY_STR , &conf->fmask   },
+    {'p', "brick-path"  , "BRICK_PATH"     , CFG_DTYPE_STR , &conf->bpath   },
     {'n', "mask-null"   , "MASKBIT_NULL"   , CFG_DTYPE_INT , &conf->mnull   },
-    {'s', "sample-id"   , "SUBSAMPLE_ID"   , CFG_ARRAY_INT , &conf->subid   },
+    {'N', "nexp-null"   , "NEXP_NULL"      , CFG_DTYPE_INT , &conf->enull   },
     {'i', "input"       , "INPUT_FILES"    , CFG_DTYPE_STR , &conf->ilist   },
     {'f', "file-type"   , "FILE_TYPE"      , CFG_DTYPE_INT , &conf->ftype   },
     { 0 , "comment"     , "ASCII_COMMENT"  , CFG_DTYPE_CHAR, &conf->comment },
@@ -261,6 +262,7 @@ static cfg_t *conf_read(CONF *conf, const int argc, char *const *argv) {
     {'o', "output"      , "OUTPUT_FILES"   , CFG_DTYPE_STR , &conf->olist   },
     {'e', "output-col"  , "OUTPUT_COLUMN"  , CFG_ARRAY_STR , &conf->ocol    },
     {'M', "mask-col"    , "MASKBIT_COLUMN" , CFG_DTYPE_STR , &conf->mcol    },
+    {'E', "nexp-cols"   , "NEXP_COLUMNS"   , CFG_ARRAY_STR , &conf->ecol    },
     {'O', "overwrite"   , "OVERWRITE"      , CFG_DTYPE_INT , &conf->ovwrite },
     {'v', "verbose"     , "VERBOSE"        , CFG_DTYPE_BOOL, &conf->verbose }
   };
@@ -310,6 +312,27 @@ static inline int check_input(const char *fname, const char *key) {
     return BRICKMASK_ERR_CFG;
   }
   if (access(fname, R_OK)) {
+    P_ERR("cannot access " FMT_KEY(%s) ": `%s'\n", key, fname);
+    return BRICKMASK_ERR_FILE;
+  }
+  return 0;
+}
+
+/******************************************************************************
+Function `check_input`:
+  Check whether an input path can be accessed.
+Arguments:
+  * `fname`:    filename of the input file;
+  * `key`:      keyword of the input file.
+Return:
+  Zero on success; non-zero on error.
+******************************************************************************/
+static inline int check_input_path(const char *fname, const char *key) {
+  if (!fname || *fname == '\0') {
+    P_ERR(FMT_KEY(%s) " is not set\n", key);
+    return BRICKMASK_ERR_CFG;
+  }
+  if (access(fname, X_OK)) {
     P_ERR("cannot access " FMT_KEY(%s) ": `%s'\n", key, fname);
     return BRICKMASK_ERR_FILE;
   }
@@ -384,6 +407,51 @@ static int check_output(char *fname, const char *key, const int ovwrite) {
 }
 
 /******************************************************************************
+Function `check_fits_col`:
+  Verify a column name to be added to a FITS table.
+Arguments:
+  * `col`:      name of the FITS column to be added;
+  * `key`:      keyword for setting the column.
+Return:
+  Zero on success; non-zero on error.
+******************************************************************************/
+static inline int check_fits_col(char *col, const char *key) {
+  /* Remove quotation marks. */
+  if (col[0] == '\'' || col[0] == '"') {
+    char quote = col[0];
+    int end = 0;
+    for (int i = 1; col[i] != '\0'; i++) {
+      if (col[i] == quote) {
+        col[i] = '\0';
+        end = i;
+        break;
+      }
+    }
+    if (end == 0) {
+      P_ERR("Unbalanced quotation mark in " FMT_KEY(%s) "\n", key);
+      return BRICKMASK_ERR_CFG;
+    }
+    memmove(col, col + 1, sizeof(char) * end);
+  }
+  /* Check characters. */
+  if (col[0] == '\0') {
+    P_ERR(FMT_KEY(%s) " is empty\n", key);
+    return BRICKMASK_ERR_CFG;
+  }
+  for (int i = 0; col[i] != '\0'; i++) {
+    if (i >= BRICKMASK_FITS_MAX_COLNAME) {
+      P_ERR(FMT_KEY(%s) " is too long: %s\n", key, col);
+      return BRICKMASK_ERR_CFG;
+    }
+    if (col[i] != '_' && !isalnum(col[i])) {
+      P_ERR("Invalid character in " FMT_KEY(%s) ": '%c'\n", key, col[i]);
+      return BRICKMASK_ERR_CFG;
+    }
+  }
+  return 0;
+}
+
+/******************************************************************************
 Function `conf_verify`:
   Verify configuration parameters.
 Arguments:
@@ -399,11 +467,9 @@ static int conf_verify(const cfg_t *cfg, CONF *conf) {
   CHECK_EXIST_PARAM(BRICK_LIST, cfg, &conf->flist);
   if ((e = check_input(conf->flist, "BRICK_LIST"))) return e;
 
-  /* MASKBIT_FILES */
-  CHECK_EXIST_ARRAY(MASKBIT_FILES, cfg, &conf->fmask, conf->nsub);
-  for (int i = 0; i < conf->nsub; i++) {
-    if ((e = check_input(conf->fmask[i], "MASKBIT_FILES"))) return e;
-  }
+  /* BRICK_PATH */
+  CHECK_EXIST_PARAM(BRICK_PATH, cfg, &conf->bpath);
+  if ((e = check_input_path(conf->bpath, "BRICK_PATH"))) return e;
 
   /* MASKBIT_NULL */
   if (!cfg_is_set(cfg, &conf->mnull)) conf->mnull = DEFAULT_MASK_NULL;
@@ -412,16 +478,11 @@ static int conf_verify(const cfg_t *cfg, CONF *conf) {
     return BRICKMASK_ERR_CFG;
   }
 
-  /* SUBSAMPLE_ID */
-  if ((num = cfg_get_size(cfg, &conf->subid))) {
-    CHECK_ARRAY_LENGTH(SUBSAMPLE_ID, cfg, conf->subid, "%d", num, conf->nsub);
-    for (int i = 0; i < conf->nsub; i++) {
-      if (conf->subid[i] < 0 || conf->subid[i] > BRICKMASK_MAX_SUBID) {
-        P_ERR(FMT_KEY(SUBSAMPLE_ID) " must be between 0 and %d\n",
-            BRICKMASK_MAX_SUBID);
-        return BRICKMASK_ERR_CFG;
-      }
-    }
+  /* NEXP_NULL */
+  if (!cfg_is_set(cfg, &conf->enull)) conf->enull = DEFAULT_NEXP_NULL;
+  if (conf->enull < 0) {
+    P_ERR(FMT_KEY(NEXP_NULL) " must be non-negative\n");
+    return BRICKMASK_ERR_CFG;
   }
 
   /* INPUT_FILES */
@@ -572,42 +633,13 @@ static int conf_verify(const cfg_t *cfg, CONF *conf) {
 
   /* MASKBIT_COLUMN */
   if (conf->ftype == BRICKMASK_FFMT_FITS) {
-    if (!cfg_is_set(cfg, &conf->mcol)) {
-      P_ERR(FMT_KEY(MASKBIT_COLUMN) " is not set\n");
-      return BRICKMASK_ERR_CFG;
-    }
-    /* Remove quotation marks. */
-    if (conf->mcol[0] == '\'' || conf->mcol[0] == '"') {
-      char quote = conf->mcol[0];
-      int end = 0;
-      for (int i = 1; conf->mcol[i] != '\0'; i++) {
-        if (conf->mcol[i] == quote) {
-          conf->mcol[i] = '\0';
-          end = i;
-          break;
-        }
-      }
-      if (end == 0) {
-        P_ERR("Unbalanced quotation mark in " FMT_KEY(MASKBIT_COLUMN) "\n");
-        return BRICKMASK_ERR_CFG;
-      }
-      memmove(conf->mcol, conf->mcol + 1, sizeof(char) * end);
-    }
-    /* Check characters. */
-    if (conf->mcol[0] == '\0') {
-      P_ERR(FMT_KEY(MASKBIT_COLUMN) " is empty\n");
-      return BRICKMASK_ERR_CFG;
-    }
-    for (int i = 0; conf->mcol[i] != '\0'; i++) {
-      if (i >= BRICKMASK_FITS_MAX_COLNAME) {
-        P_ERR(FMT_KEY(MASKBIT_COLUMN) " is too long: %s\n", conf->mcol);
-        return BRICKMASK_ERR_CFG;
-      }
-      if (conf->mcol[i] != '_' && !isalnum(conf->mcol[i])) {
-        P_ERR("Invalid character in " FMT_KEY(MASKBIT_COLUMN) ": '%c'\n",
-            conf->mcol[i]);
-        return BRICKMASK_ERR_CFG;
-      }
+    CHECK_EXIST_PARAM(MASKBIT_COLUMN, cfg, &conf->mcol);
+    if ((e = check_fits_col(conf->mcol, "MASKBIT_COLUMN"))) return e;
+
+    CHECK_EXIST_ARRAY(NEXP_COLUMNS, cfg, &conf->ecol, num);
+    CHECK_ARRAY_LENGTH(NEXP_COLUMNS, cfg, conf->ecol, "%s", num, 3);
+    for (int i = 0; i < 3; i++) {
+      if ((e = check_fits_col(conf->ecol[i], "NEXP_COLUMNS"))) return e;
     }
   }
 
@@ -634,13 +666,9 @@ static void conf_print(const CONF *conf) {
 
   /* Input catalogs. */
   printf("\n  BRICK_LIST      = %s", conf->flist);
-  printf("\n  MASKBIT_FILES   = %s", conf->fmask[0]);
-  for (int i = 1; i < conf->nsub; i++)
-    printf("\n                    %s", conf->fmask[i]);
-  if (conf->subid) {
-    printf("\n  SUBSAMPLE_ID    = %d", conf->subid[0]);
-    for (int i = 1; i < conf->nsub; i++) printf(" , %d", conf->subid[i]);
-  }
+  printf("\n  BRICK_PATH      = %s", conf->bpath);
+  printf("\n  MASKBIT_NULL    = %d", conf->mnull);
+  printf("\n  NEXP_NULL       = %d", conf->enull);
   printf("\n  INPUT_FILES     = %s", conf->ilist);
 
   const char *ftype[2] = {"ASCII", "FITS"};
@@ -663,8 +691,11 @@ static void conf_print(const CONF *conf) {
       for (int i = 1; i < conf->ncol; i++) printf(" , %s", conf->ocol[i]);
     }
   }
-  if (conf->ftype == BRICKMASK_FFMT_FITS)
+  if (conf->ftype == BRICKMASK_FFMT_FITS) {
     printf("\n  MASKBIT_COLUMN  = %s", conf->mcol);
+    printf("\n  NEXP_COLUMNS    = %s , %s , %s", conf->ecol[0], conf->ecol[1],
+        conf->ecol[2]);
+  }
 
   printf("\n  OVERWRITE       = %d\n", conf->ovwrite);
 }
@@ -721,8 +752,7 @@ Arguments:
 void conf_destroy(CONF *conf) {
   if (!conf) return;
   FREE_ARRAY(conf->flist);
-  FREE_STR_ARRAY(conf->fmask);
-  FREE_ARRAY(conf->subid);
+  FREE_ARRAY(conf->bpath);
   FREE_ARRAY(conf->ilist);
   FREE_STR_ARRAY(conf->input);
   FREE_STR_ARRAY(conf->cname);
@@ -731,5 +761,6 @@ void conf_destroy(CONF *conf) {
   FREE_STR_ARRAY(conf->ocol);
   FREE_ARRAY(conf->onum);
   FREE_ARRAY(conf->mcol);
+  FREE_STR_ARRAY(conf->ecol);
   free(conf);
 }

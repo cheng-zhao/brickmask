@@ -158,52 +158,56 @@ typedef struct {
 Function `reorder_mask_reduce`:
   Reorder maskbits, and reduce the length of the data type if applicable.
 Arguments:
-  * `data`:     structure for the the data catalogue.
+  * `code`:     array for maskbits;
+  * `dtype`:    datatype of maskbits;
+  * `idx`:      original index of the data points;
+  * `ndata`:    number of data points.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-static inline int reorder_mask_reduce(DATA *data) {
+static inline int reorder_mask_reduce(uint64_t **code, const int dtype,
+    const size_t *idx, const size_t ndata) {
   void *mask;
-  switch (data->mtype) {
+  switch (dtype) {
     case TBYTE:
-      if (!(mask = malloc(data->n * sizeof(unsigned char)))) {
+      if (!(mask = malloc(ndata * sizeof(unsigned char)))) {
         P_ERR("failed to allocate memory for saving maskbits\n");
         return BRICKMASK_ERR_MEMORY;
       }
-      for (size_t i = 0; i < data->n; i++)
-        ((unsigned char *) mask)[data->idx[i]] = data->mask[i];
+      for (size_t i = 0; i < ndata; i++)
+        ((unsigned char *) mask)[idx[i]] = (*code)[i];
       break;
     case TSHORT:
-      if (!(mask = malloc(data->n * sizeof(uint16_t)))) {
+      if (!(mask = malloc(ndata * sizeof(uint16_t)))) {
         P_ERR("failed to allocate memory for saving maskbits\n");
         return BRICKMASK_ERR_MEMORY;
       }
-      for (size_t i = 0; i < data->n; i++)
-        ((uint16_t *) mask)[data->idx[i]] = data->mask[i];
+      for (size_t i = 0; i < ndata; i++)
+        ((uint16_t *) mask)[idx[i]] = (*code)[i];
       break;
     case TINT:
-      if (!(mask = malloc(data->n * sizeof(uint32_t)))) {
+      if (!(mask = malloc(ndata * sizeof(uint32_t)))) {
         P_ERR("failed to allocate memory for saving maskbits\n");
         return BRICKMASK_ERR_MEMORY;
       }
-      for (size_t i = 0; i < data->n; i++)
-        ((uint32_t *) mask)[data->idx[i]] = data->mask[i];
+      for (size_t i = 0; i < ndata; i++)
+        ((uint32_t *) mask)[idx[i]] = (*code)[i];
       break;
     case TLONG:
-      if (!(mask = malloc(data->n * sizeof(uint64_t)))) {
+      if (!(mask = malloc(ndata * sizeof(uint64_t)))) {
         P_ERR("failed to allocate memory for saving maskbits\n");
         return BRICKMASK_ERR_MEMORY;
       }
-      for (size_t i = 0; i < data->n; i++)
-        ((uint64_t *) mask)[data->idx[i]] = data->mask[i];
+      for (size_t i = 0; i < ndata; i++)
+        ((uint64_t *) mask)[idx[i]] = (*code)[i];
       break;
     default:
-      P_ERR("unexpected data type for maskbits: %d\n", data->mtype);
+      P_ERR("unexpected data type for maskbits: %d\n", dtype);
       return BRICKMASK_ERR_UNKNOWN;
   }
 
-  free(data->mask);
-  data->mask = mask;
+  free(*code);
+  *code = mask;
   return 0;
 }
 
@@ -211,42 +215,23 @@ static inline int reorder_mask_reduce(DATA *data) {
 Function `reorder_mask`:
   Restore the original maskbits before data sorting.
 Arguments:
-  * `data`:     structure for the the data catalogue.
+  * `code`:     array for maskbits;
+  * `idx`:      original index of the data points;
+  * `ndata`:    number of data points.
 Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
-static inline int reorder_mask(DATA *data) {
-  uint64_t *mask = malloc(data->n * sizeof(uint64_t));
+static inline int reorder_mask(uint64_t **code, const size_t *idx,
+    const size_t ndata) {
+  uint64_t *mask = malloc(ndata * sizeof(uint64_t));
   if (!mask) {
     P_ERR("failed to allocate memory for saving maskbits\n");
     return BRICKMASK_ERR_MEMORY;
   }
 
-  for (size_t i = 0; i < data->n; i++) mask[data->idx[i]] = data->mask[i];
-  free(data->mask);
-  data->mask = mask;
-  return 0;
-}
-
-/******************************************************************************
-Function `reorder_subid`:
-  Restore the original subsample ID before data sorting.
-Arguments:
-  * `data`:     structure for the the data catalogue.
-Return:
-  Zero on success; non-zero on error.
-******************************************************************************/
-static inline int reorder_subid(DATA *data) {
-  if (!data->subid) return 0;           /* subsample ID is not required */
-  unsigned char *subid = malloc(data->n * sizeof(unsigned char));
-  if (!subid) {
-    P_ERR("failed to allocate memory for saving subsample IDs\n");
-    return BRICKMASK_ERR_MEMORY;
-  }
-
-  for (size_t i = 0; i < data->n; i++) subid[data->idx[i]] = data->subid[i];
-  free(data->subid);
-  data->subid = subid;
+  for (size_t i = 0; i < ndata; i++) mask[idx[i]] = (*code)[i];
+  free(*code);
+  *code = mask;
   return 0;
 }
 
@@ -310,14 +295,26 @@ int reorder_data(DATA *data) {
 
   switch (data->fmt) {
     case BRICKMASK_FFMT_ASCII:
-      if (reorder_mask(data)) return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask(&(data->mask), data->idx, data->n))
+        return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask(data->nexp, data->idx, data->n))
+        return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask(data->nexp + 1, data->idx, data->n))
+        return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask(data->nexp + 2, data->idx, data->n))
+        return BRICKMASK_ERR_MEMORY;
       break;
     case BRICKMASK_FFMT_FITS:
-      if (reorder_mask_reduce(data)) return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask_reduce(&(data->mask), data->mtype, data->idx, data->n))
+        return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask_reduce(data->nexp, data->etype[0], data->idx, data->n))
+        return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask_reduce(data->nexp + 1, data->etype[1], data->idx,
+          data->n)) return BRICKMASK_ERR_MEMORY;
+      if (reorder_mask_reduce(data->nexp + 2, data->etype[2], data->idx,
+          data->n)) return BRICKMASK_ERR_MEMORY;
       break;
   }
-
-  if (reorder_subid(data)) return BRICKMASK_ERR_MEMORY;
 
   printf(FMT_DONE);
   return 0;

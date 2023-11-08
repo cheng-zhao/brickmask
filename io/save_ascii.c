@@ -266,12 +266,10 @@ int save_ascii(const CONF *conf, const DATA *data, const int idx) {
     WRITE_LINE(ofile, "%s", content + data->cidx[i]);
 
     /* Write maskbits. */
-    WRITE_LINE(ofile, "%" PRIu64, data->mask[i]);
-
-    /* Write subsample IDs if applicable. */
-    if (data->subid) WRITE_LINE(ofile, " %" PRIu8, data->subid[i]);
-
-    WRITE_LINE(ofile, "\n");
+    WRITE_LINE(ofile, "%" PRIu64 " ", data->mask[i]);
+    WRITE_LINE(ofile, "%" PRIu64 " ", data->nexp[0][i]);
+    WRITE_LINE(ofile, "%" PRIu64 " ", data->nexp[1][i]);
+    WRITE_LINE(ofile, "%" PRIu64 "\n", data->nexp[2][i]);
   }
 
   output_destroy(ofile);

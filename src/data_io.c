@@ -44,7 +44,6 @@ static DATA *data_init(const CONF *conf) {
   data->idx = data->cidx = data->iidx = NULL;
   data->id = NULL;
   data->mask = NULL;
-  data->subid = NULL;
   data->content = NULL;
 
   if (!(data->iidx = calloc(conf->ncat + 1, sizeof(size_t)))) {
@@ -65,12 +64,22 @@ static DATA *data_init(const CONF *conf) {
     }
   }
 
-  /* Check the data type of masks required by `MASKBIT_NULL`. */
+  /* Check the data type of masks required by `MASKBIT_NULL` and `NEXP_NULL`. */
   uint64_t mnull = conf->mnull;
   if (mnull < UINT8_MAX) data->mtype = TBYTE;
   else if (mnull < UINT16_MAX) data->mtype = TSHORT;
   else if (mnull < UINT32_MAX) data->mtype = TINT;
   else data->mtype = TLONG;
+
+  uint64_t enull = conf->enull;
+  if (enull < UINT8_MAX)
+    data->etype[0] = data->etype[1] = data->etype[2] = TBYTE;
+  else if (enull < UINT16_MAX)
+    data->etype[0] = data->etype[1] = data->etype[2] = TSHORT;
+  else if (enull < UINT32_MAX)
+    data->etype[0] = data->etype[1] = data->etype[2] = TINT;
+  else
+    data->etype[0] = data->etype[1] = data->etype[2] = TLONG;
 
   return data;
 }
@@ -160,7 +169,9 @@ DATA *read_data(const CONF *conf) {
   if (!(data->idx = malloc(data->n * sizeof(size_t))) ||
       !(data->id = malloc(data->n * sizeof(long))) ||
       !(data->mask = calloc(data->n, sizeof(uint64_t))) ||
-      (conf->subid && !(data->subid = calloc(data->n, sizeof(uint8_t))))) {
+      !(data->nexp[0] = calloc(data->n, sizeof(uint64_t))) ||
+      !(data->nexp[1] = calloc(data->n, sizeof(uint64_t))) ||
+      !(data->nexp[2] = calloc(data->n, sizeof(uint64_t)))) {
     P_ERR("failed to allocate memory for additional columns of the data\n");
     data_destroy(data);
     return NULL;
@@ -249,7 +260,9 @@ void data_destroy(DATA *data) {
   if (data->iidx) free(data->iidx);
   if (data->id) free(data->id);
   if (data->mask) free(data->mask);
-  if (data->subid) free(data->subid);
+  for (int i = 0; i < 3; i++) {
+    if (data->nexp[i]) free(data->nexp[i]);
+  }
   if (data->content) free(data->content);
   free(data);
 }

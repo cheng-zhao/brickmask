@@ -16,6 +16,7 @@
 #include "read_file.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <limits.h>
 #include <math.h>
 
@@ -40,32 +41,17 @@ static BRICK *brick_init(const CONF *conf) {
 
   brick->ra1 = brick->ra2 = brick->dec1 = brick->dec2 = NULL;
   brick->name = NULL;
-  brick->nmask = NULL;
-  brick->fmask = NULL;
-#ifdef MPI
-  brick->mlen = NULL;
-#endif
-  brick->subid = NULL;
+  brick->photsys = NULL;
   brick->mnull = conf->mnull;
+  brick->enull = conf->enull;
 
-  brick->nsp = conf->nsub;
-  if (!(brick->subid = malloc(brick->nsp * sizeof(int))) ||
-      !(brick->nmask = malloc(brick->nsp * sizeof(size_t))) ||
-#ifdef MPI
-      !(brick->mlen = malloc(brick->nsp * sizeof(size_t))) ||
-#endif
-      !(brick->fmask = malloc(brick->nsp * sizeof(char **)))) {
-    P_ERR("failed to allocate memory for maskbit information\n");
+  size_t len = strlen(conf->bpath) + 1;
+  if (!(brick->bpath = calloc(len, sizeof(char)))) {
+    P_ERR("failed to allocate memory for bricks\n");
     brick_destroy(brick);
     return NULL;
   }
-  for (int i = 0; i < brick->nsp; i++) brick->fmask[i] = NULL;
-  if (conf->subid) {
-    for (int i = 0; i < brick->nsp; i++) brick->subid[i] = conf->subid[i];
-  }
-  else {
-    for (int i = 0; i < brick->nsp; i++) brick->subid[i] = i;
-  }
+  memcpy(brick->bpath, conf->bpath, len);
 
   return brick;
 }
@@ -79,10 +65,18 @@ Return:
   Zero on success; non-zero on error.
 ******************************************************************************/
 static inline int check_brick(BRICK *brick) {
+#ifdef MPI
+  if (brick->n > BRICKMASK_MAX_BRICK ||
+      brick->n * (brick->nlen + 1) > BRICKMASK_MAX_BRICK) {
+    P_ERR("there are too many bricks: %zu\n", brick->n);
+    return BRICKMASK_ERR_BRICK;
+  }
+#else
   if (brick->n > LONG_MAX) {
     P_ERR("there are too many bricks: %zu\n", brick->n);
     return BRICKMASK_ERR_BRICK;
   }
+#endif
   for (size_t i = 0; i < brick->n; i++) {
     brick->ra1[i] = round(brick->ra1[i] / BRICKMASK_TOL) * BRICKMASK_TOL;
     brick->ra2[i] = round(brick->ra2[i] / BRICKMASK_TOL) * BRICKMASK_TOL;
@@ -134,31 +128,6 @@ BRICK *get_brick(const CONF *conf) {
   if (conf->verbose)
     printf("  Brick information is loaded from file: `%s'\n", conf->flist);
 
-  /* Read names of maskbit files. */
-  size_t cnt = 0;
-  for (int i = 0; i < conf->nsub; i++) {
-#ifdef MPI
-    if (!(brick->mlen[i] = read_fname(conf->fmask[i], brick->fmask + i,
-        brick->nmask + i)))
-#else
-    if (!read_fname(conf->fmask[i], brick->fmask + i, brick->nmask + i))
-#endif
-    {
-      brick_destroy(brick);
-      return NULL;
-    }
-    cnt += brick->nmask[i];
-  }
-  if (conf->verbose)
-    printf("  %zu maskbit files are detected in total\n", cnt);
-
-#ifdef DEBUG1
-  for (int i = 0; i < brick->nsp; i++) {
-    for (size_t j = 0; j < brick->nmask[i]; j++)
-      printf("'%s'\n", brick->fmask[i][j]);
-  }
-#endif
-
   printf(FMT_DONE);
   return brick;
 }
@@ -179,19 +148,7 @@ void brick_destroy(BRICK *brick) {
     if (*(brick->name)) free(*(brick->name));
     free(brick->name);
   }
-  if (brick->subid) free(brick->subid);
-  if (brick->nmask) free(brick->nmask);
-  if (brick->fmask) {
-    for (int i = 0; i < brick->nsp; i++) {
-      if (brick->fmask[i]) {
-        if (*(brick->fmask[i])) free(*(brick->fmask[i]));
-        free(brick->fmask[i]);
-      }
-    }
-    free(brick->fmask);
-  }
-#ifdef MPI
-  if (brick->mlen) free(brick->mlen);
-#endif
+  if (brick->photsys) free(brick->photsys);
+  if (brick->bpath) free(brick->bpath);
   free(brick);
 }
